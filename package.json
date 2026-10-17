@@ -1,0 +1,36 @@
+{
+  "name": "prerna-store",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Prerna Store - Blinkit-style quick-commerce grocery platform",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run --workspace=apps/api start:dev",
+    "dev:web": "npm run --workspace=apps/web dev",
+    "build": "npm run --workspace=apps/api build && npm run --workspace=apps/web build",
+    "db:generate": "prisma generate --schema=prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
+    "db:push": "prisma db push --schema=prisma/schema.prisma",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --schema=prisma/schema.prisma --force",
+    "db:studio": "prisma studio --schema=prisma/schema.prisma",
+    "test:e2e": "tsx scripts/test-e2e.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "concurrently": "^9.1.2",
+    "dotenv": "^16.4.7",
+    "prisma": "^6.3.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.3.1",
+    "@types/bcryptjs": "^2.4.6",
+    "axios": "^1.20.0",
+    "bcryptjs": "^3.0.3"
+  }
+}
