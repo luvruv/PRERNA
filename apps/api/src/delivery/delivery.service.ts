@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
+import { TrackingGateway } from './tracking.gateway';
 import { OrderStatus, Role, DeliveryStatus } from '@prisma/client';
 
 @Injectable()
@@ -13,9 +14,23 @@ export class DeliveryService {
   constructor(
     private prisma: PrismaService,
     private ordersService: OrdersService,
+    private trackingGateway: TrackingGateway,
   ) {}
 
   async getDeliveryPartnerProfile(userId: string) {
+    if (!this.prisma.isConnected) {
+      return {
+        id: 'demo-dp-1',
+        userId,
+        vehicleType: 'EV Bike',
+        vehicleNumber: 'HR-26-EE-1024',
+        currentLat: 28.4625,
+        currentLng: 77.0892,
+        isAvailable: true,
+        user: { name: 'Vikram Singh (Rider)', phone: '+91 9876543213' },
+      };
+    }
+
     const partner = await this.prisma.deliveryPartner.findUnique({
       where: { userId },
       include: { user: true },
@@ -30,6 +45,10 @@ export class DeliveryService {
 
   // 1. Available orders waiting for a delivery partner to take/accept
   async getAvailableOrders(userId: string) {
+    if (!this.prisma.isConnected) {
+      return [];
+    }
+
     const partner = await this.getDeliveryPartnerProfile(userId);
 
     const orders = await this.prisma.order.findMany({
@@ -120,6 +139,10 @@ export class DeliveryService {
 
   // 3. Active assigned deliveries for this partner
   async getActiveDeliveries(userId: string) {
+    if (!this.prisma.isConnected) {
+      return [];
+    }
+
     const partner = await this.getDeliveryPartnerProfile(userId);
 
     return this.prisma.deliveryAssignment.findMany({
@@ -170,7 +193,20 @@ export class DeliveryService {
           currentLng: longitude,
         },
       });
+
+      this.trackingGateway.broadcastRiderLocation(orderId, {
+        latitude,
+        longitude,
+        updatedAt: new Date().toISOString(),
+      });
     } else {
+      const activeAssignments = await this.prisma.deliveryAssignment.findMany({
+        where: {
+          deliveryPartnerId: partner.id,
+          status: { in: [DeliveryStatus.ASSIGNED, DeliveryStatus.PICKED_UP, DeliveryStatus.OUT_FOR_DELIVERY] },
+        },
+      });
+
       await this.prisma.deliveryAssignment.updateMany({
         where: {
           deliveryPartnerId: partner.id,
@@ -181,6 +217,14 @@ export class DeliveryService {
           currentLng: longitude,
         },
       });
+
+      for (const assign of activeAssignments) {
+        this.trackingGateway.broadcastRiderLocation(assign.orderId, {
+          latitude,
+          longitude,
+          updatedAt: new Date().toISOString(),
+        });
+      }
     }
 
     return {

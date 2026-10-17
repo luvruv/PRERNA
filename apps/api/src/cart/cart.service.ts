@@ -6,11 +6,17 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AddToCartDto, UpdateCartItemDto } from './dto/cart.dto';
 
+const inMemoryCarts = new Map<string, any[]>();
+
 @Injectable()
 export class CartService {
   constructor(private prisma: PrismaService) {}
 
   async getOrCreateCart(userId: string) {
+    if (!this.prisma.isConnected) {
+      return { id: `cart-${userId}`, userId };
+    }
+
     let cart = await this.prisma.cart.findUnique({
       where: { userId },
     });
@@ -25,6 +31,46 @@ export class CartService {
   }
 
   async getCart(userId: string) {
+    if (!this.prisma.isConnected) {
+      const items = inMemoryCarts.get(userId) || [];
+      let subtotal = 0;
+      let totalItems = 0;
+
+      const formattedItems = items.map((item) => {
+        const itemSubtotal = (item.price || 0) * item.quantity;
+        subtotal += itemSubtotal;
+        totalItems += item.quantity;
+
+        return {
+          id: item.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          productName: item.productName || 'Fresh Grocery Item',
+          price: item.price || 50,
+          mrp: item.mrp || 60,
+          unit: item.unit || '1 pc',
+          image: item.image || '',
+          store: item.store || { id: 'demo-store-1', name: 'Prerna Fresh Mart - DLF Phase 4' },
+          availableQty: item.availableQty || 50,
+          subtotal: itemSubtotal,
+        };
+      });
+
+      const deliveryFee = totalItems > 0 ? 25.0 : 0.0;
+      const tax = Math.round(subtotal * 0.05 * 100) / 100;
+      const total = Math.round((subtotal + deliveryFee + tax) * 100) / 100;
+
+      return {
+        id: `cart-${userId}`,
+        items: formattedItems,
+        totalItems,
+        subtotal,
+        deliveryFee,
+        tax,
+        total,
+      };
+    }
+
     const cart = await this.getOrCreateCart(userId);
 
     const items = await this.prisma.cartItem.findMany({

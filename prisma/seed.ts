@@ -250,6 +250,9 @@ async function main() {
       bannerUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80',
       logoUrl: 'https://images.unsplash.com/photo-1543083477-4f785aeafaa9?auto=format&fit=crop&w=200&q=80',
       rating: 4.9,
+      latitude: 28.4595,
+      longitude: 77.0266,
+      deliveryRadiusKm: 10.0,
       ownerId: shopkeepers[0].id,
       extraStaffId: panelMerchant.id, // Panel merchant co-owns/manages Store 0
     },
@@ -266,6 +269,9 @@ async function main() {
       bannerUrl: 'https://images.unsplash.com/photo-1506484381205-f7945653044d?auto=format&fit=crop&w=1200&q=80',
       logoUrl: 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=200&q=80',
       rating: 4.8,
+      latitude: 28.4680,
+      longitude: 77.0610,
+      deliveryRadiusKm: 8.0,
       ownerId: shopkeepers[1].id,
     },
     {
@@ -281,6 +287,9 @@ async function main() {
       bannerUrl: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=1200&q=80',
       logoUrl: 'https://images.unsplash.com/photo-1583258292688-d0213dc5a3a8?auto=format&fit=crop&w=200&q=80',
       rating: 4.7,
+      latitude: 28.4410,
+      longitude: 77.0980,
+      deliveryRadiusKm: 12.0,
       ownerId: shopkeepers[2].id,
     },
   ];
@@ -301,6 +310,9 @@ async function main() {
         bannerUrl: s.bannerUrl,
         logoUrl: s.logoUrl,
         rating: s.rating,
+        latitude: s.latitude,
+        longitude: s.longitude,
+        deliveryRadiusKm: s.deliveryRadiusKm,
         staff: {
           create: [
             {

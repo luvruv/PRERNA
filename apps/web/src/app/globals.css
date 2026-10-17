@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import 'leaflet/dist/leaflet.css';
 
 @tailwind base;
 @tailwind components;
@@ -36,4 +37,17 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #D9700F;
+}
+
+/* Leaflet stacking isolation: Keep Leaflet maps, panes, and controls confined within their cards */
+.leaflet-container {
+  isolation: isolate;
+  position: relative;
+  z-index: 0 !important;
+}
+
+/* Ensure Leaflet controls stay within bounds and do not bleed above sticky headers */
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 20 !important;
 }

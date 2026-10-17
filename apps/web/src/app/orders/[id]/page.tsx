@@ -148,6 +148,7 @@ export default function OrderTrackingPage() {
       {/* Live GPS Route Tracking Map */}
       {!isCancelled && (
         <OrderGpsTrackingMap
+          orderId={order.id}
           orderStatus={order.status}
           storeName={order.store?.name}
           storeAddress={order.store?.address}

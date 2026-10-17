@@ -17,6 +17,7 @@ import {
   UpdateProductDto,
   AdjustInventoryDto,
 } from './dto/shopkeeper.dto';
+import { UpdateStoreDto } from './dto/update-store.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -30,6 +31,18 @@ import { Role, OrderStatus } from '@prisma/client';
 @Controller('shopkeeper')
 export class ShopkeeperController {
   constructor(private shopkeeperService: ShopkeeperService) {}
+
+  @Get('store')
+  @ApiOperation({ summary: 'Get merchant store profile with location, coordinates, and delivery radius' })
+  async getStore(@CurrentUser() user: any) {
+    return this.shopkeeperService.getStoreProfile(user.id);
+  }
+
+  @Put('store')
+  @ApiOperation({ summary: 'Update merchant store location, address, coordinates, and delivery radius' })
+  async updateStore(@CurrentUser() user: any, @Body() dto: UpdateStoreDto) {
+    return this.shopkeeperService.updateStoreProfile(user.id, dto);
+  }
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Get merchant dashboard with live metrics and recent orders' })

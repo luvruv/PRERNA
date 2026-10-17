@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import ProductCard from '@/components/ui/ProductCard';
+import NearbyShopsSection from '@/components/shops/NearbyShopsSection';
 
 export default function HomePage() {
   // 1. Fetch categories
@@ -23,19 +24,13 @@ export default function HomePage() {
     queryFn: () => api.get('/categories'),
   });
 
-  // 2. Fetch stores
-  const { data: stores = [], isLoading: storesLoading } = useQuery({
-    queryKey: ['stores'],
-    queryFn: () => api.get('/stores'),
-  });
-
-  // 3. Fetch featured & fresh products
+  // 2. Fetch featured & fresh products
   const { data: popularData, isLoading: productsLoading } = useQuery({
     queryKey: ['products', 'popular'],
     queryFn: () => api.get('/products?limit=12&sort=newest'),
   });
 
-  // 4. Fetch dairy essentials
+  // 3. Fetch dairy essentials
   const { data: dairyData } = useQuery({
     queryKey: ['products', 'dairy'],
     queryFn: () => api.get('/products?category=dairy-breakfast&limit=6'),
@@ -142,65 +137,8 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* Stores Near You (Figma screen matching) */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl md:text-2xl font-black text-[#6B3A0A]">Stores Near You</h2>
-            <p className="text-xs text-[#8C6D53]">Fulfilled directly by your neighborhood merchant partners</p>
-          </div>
-          <Link
-            href="/stores"
-            className="text-xs font-bold text-[#D9700F] hover:underline flex items-center gap-1"
-          >
-            <span>View all stores</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {stores.map((store: any) => (
-            <Link
-              key={store.id}
-              href={`/stores/${store.id}`}
-              className="group bg-white rounded-2xl overflow-hidden border border-[#F0DEC8] hover:border-[#D9700F]/50 transition-all shadow-card hover:shadow-soft flex flex-col"
-            >
-              <div className="relative h-32 w-full bg-[#FDF1E6] overflow-hidden">
-                <img
-                  src={store.bannerUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80'}
-                  alt={store.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute top-2.5 right-2.5 bg-white/95 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1 text-[11px] font-black text-[#6B3A0A] shadow-sm">
-                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                  <span>{store.rating}</span>
-                </div>
-                <div className="absolute bottom-2 left-2.5 bg-[#D9700F] text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                  <Clock className="w-2.5 h-2.5" />
-                  <span>10-15 Mins</span>
-                </div>
-              </div>
-
-              <div className="p-4 flex-1 flex flex-col justify-between">
-                <div>
-                  <h3 className="font-extrabold text-base text-[#6B3A0A] group-hover:text-[#D9700F] transition-colors">
-                    {store.name}
-                  </h3>
-                  <p className="text-xs text-[#8C6D53] line-clamp-2 mt-1">
-                    {store.description}
-                  </p>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-[#F7E3CF]/50 flex items-center justify-between text-xs font-semibold text-[#B39378]">
-                  <span>{store.address}</span>
-                  <span className="text-[#D9700F] flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                    Enter <ChevronRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {/* Stores Near You with Dynamic Distance & Coverage Check */}
+      <NearbyShopsSection />
 
       {/* Popular Farm-Fresh Products Grid */}
       <section className="space-y-4">

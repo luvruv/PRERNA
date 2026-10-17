@@ -17,18 +17,23 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useCartStore } from '@/lib/store/useCartStore';
+import { useLocationStore } from '@/lib/store/useLocationStore';
+import AddressDeliveryModal from '@/components/location/AddressDeliveryModal';
 
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, isAuthenticated, logout, loadProfile } = useAuthStore();
   const { cart, fetchCart } = useCartStore();
+  const { address, isGpsLocated, loadStoredLocation } = useLocationStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
 
   useEffect(() => {
     loadProfile();
-  }, [loadProfile]);
+    loadStoredLocation();
+  }, [loadProfile, loadStoredLocation]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -49,7 +54,8 @@ export default function Navbar() {
     pathname.startsWith('/admin');
 
   return (
-    <header className="sticky top-0 z-40 bg-[#FAF3EB]/95 backdrop-blur-md border-b border-[#F0DEC8]">
+    <>
+      <header className="sticky top-0 z-50 bg-[#FAF3EB]/95 backdrop-blur-md border-b border-[#F0DEC8]">
       {/* Top micro-bar for quick demo role navigation */}
       <div className="bg-[#6B3A0A] text-[#FDF1E6] text-xs py-1 px-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -99,17 +105,31 @@ export default function Navbar() {
             </div>
           </Link>
 
-          {/* Delivery Location badge */}
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-white/80 rounded-full border border-[#F0DEC8] text-xs text-[#6B3A0A]">
-            <MapPin className="w-3.5 h-3.5 text-[#D9700F]" />
+          {/* Delivery Location badge - Interactive & Clickable */}
+          <button
+            type="button"
+            onClick={() => setIsAddressModalOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-white/90 hover:bg-orange-50/80 rounded-full border border-[#F0DEC8] hover:border-[#D9700F] text-xs text-[#6B3A0A] transition-all shadow-sm group active:scale-95 text-left"
+            title="Click to change delivery address or track GPS"
+          >
+            <div className="w-6 h-6 rounded-full bg-[#FFF2E5] text-[#D9700F] flex items-center justify-center shrink-0 group-hover:bg-[#D9700F] group-hover:text-white transition-colors">
+              <MapPin className="w-3.5 h-3.5" />
+            </div>
             <div className="flex flex-col text-left">
-              <span className="font-bold text-[11px] leading-tight">Delivery in 10 Mins</span>
-              <span className="text-[10px] text-[#8C6D53] truncate max-w-[140px]">
-                Galleria Market, Gurugram
+              <div className="flex items-center gap-1">
+                <span className="font-extrabold text-[11px] leading-tight text-[#6B3A0A] group-hover:text-[#D9700F]">
+                  Delivery in 10 Mins
+                </span>
+                {isGpsLocated && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" title="GPS Verified" />
+                )}
+              </div>
+              <span className="text-[10px] text-[#8C6D53] truncate max-w-[110px] sm:max-w-[140px] lg:max-w-[170px]">
+                {address}
               </span>
             </div>
-            <ChevronDown className="w-3 h-3 text-[#A66C3E]" />
-          </div>
+            <ChevronDown className="w-3 h-3 text-[#A66C3E] group-hover:text-[#D9700F] group-hover:translate-y-0.5 transition-all" />
+          </button>
         </div>
 
         {/* Global Search input */}
@@ -276,6 +296,14 @@ export default function Navbar() {
           />
         </form>
       </div>
-    </header>
+
+      </header>
+
+      {/* Delivery Address & GPS Modal */}
+      <AddressDeliveryModal
+        isOpen={isAddressModalOpen}
+        onClose={() => setIsAddressModalOpen(false)}
+      />
+    </>
   );
 }

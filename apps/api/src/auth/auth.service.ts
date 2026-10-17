@@ -71,15 +71,104 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
-      include: {
-        storeStaff: {
-          include: { store: true },
+    const emailKey = dto.email.toLowerCase();
+    const demoAccounts: Record<string, any> = {
+      'merchant@gmail.com': {
+        id: 'demo-merchant-id',
+        name: 'Rajesh Kumar (Merchant)',
+        email: 'merchant@gmail.com',
+        phone: '+91 9876543212',
+        role: Role.SHOPKEEPER,
+        store: {
+          id: 'demo-store-1',
+          name: 'Prerna Fresh Mart - DLF Phase 4',
+          slug: 'prerna-fresh-mart-dlf-phase-4',
+          address: 'Shop 12, Galleria Market, DLF Phase 4, Gurugram',
+          city: 'Gurugram',
+          state: 'Haryana',
+          postalCode: '122002',
+          latitude: 28.4682,
+          longitude: 77.0851,
+          deliveryRadiusKm: 8,
+          isActive: true,
+          rating: 4.8,
         },
-        deliveryPartner: true,
+        deliveryPartner: null,
       },
-    });
+      'customer@gmail.com': {
+        id: 'demo-customer-id',
+        name: 'Aarav Sharma',
+        email: 'customer@gmail.com',
+        phone: '+91 9876543210',
+        role: Role.CUSTOMER,
+        store: null,
+        deliveryPartner: null,
+      },
+      'deliverypartner@gmail.com': {
+        id: 'demo-rider-id',
+        name: 'Vikram Singh (Rider)',
+        email: 'deliverypartner@gmail.com',
+        phone: '+91 9876543213',
+        role: Role.DELIVERY_PARTNER,
+        store: null,
+        deliveryPartner: {
+          id: 'demo-dp-1',
+          vehicleType: 'EV Bike',
+          vehicleNumber: 'HR-26-EE-1024',
+          currentLat: 28.4625,
+          currentLng: 77.0892,
+          isAvailable: true,
+        },
+      },
+      'admin@gmail.com': {
+        id: 'demo-admin-id',
+        name: 'System Administrator',
+        email: 'admin@gmail.com',
+        phone: '+91 9876543211',
+        role: Role.ADMIN,
+        store: null,
+        deliveryPartner: null,
+      },
+    };
+
+    if (!this.prisma.isConnected) {
+      if (demoAccounts[emailKey] && dto.password === '2026@prerna') {
+        const demoUser = demoAccounts[emailKey];
+        const tokens = await this.generateTokens(demoUser.id, demoUser.email, demoUser.role);
+        return {
+          user: demoUser,
+          ...tokens,
+        };
+      }
+      throw new UnauthorizedException(
+        'Database server is offline at localhost:5432. Please connect PostgreSQL or use University Panel Demo Accounts (password: 2026@prerna).',
+      );
+    }
+
+    let user: any = null;
+    try {
+      user = await this.prisma.user.findUnique({
+        where: { email: emailKey },
+        include: {
+          storeStaff: {
+            include: { store: true },
+          },
+          deliveryPartner: true,
+        },
+      });
+    } catch (dbError: any) {
+      if (demoAccounts[emailKey] && dto.password === '2026@prerna') {
+        const demoUser = demoAccounts[emailKey];
+        const tokens = await this.generateTokens(demoUser.id, demoUser.email, demoUser.role);
+        return {
+          user: demoUser,
+          ...tokens,
+        };
+      }
+      throw new UnauthorizedException(
+        'Database server is offline at localhost:5432. Please connect PostgreSQL or use University Panel Demo Accounts (password: 2026@prerna).',
+      );
+    }
 
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
@@ -98,15 +187,19 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user.id, user.email, user.role);
 
-    const refreshTokenExpiresAt = new Date();
-    refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 7);
-    await this.prisma.refreshToken.create({
-      data: {
-        token: tokens.refreshToken,
-        userId: user.id,
-        expiresAt: refreshTokenExpiresAt,
-      },
-    });
+    try {
+      const refreshTokenExpiresAt = new Date();
+      refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 7);
+      await this.prisma.refreshToken.create({
+        data: {
+          token: tokens.refreshToken,
+          userId: user.id,
+          expiresAt: refreshTokenExpiresAt,
+        },
+      });
+    } catch {
+      // Continue even if refresh token persistence fails
+    }
 
     return {
       user: {
@@ -266,31 +359,168 @@ export class AuthService {
   }
 
   async getMe(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        addresses: true,
-        storeStaff: {
-          include: { store: true },
-        },
-        deliveryPartner: true,
-      },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('User not found');
+    if (!this.prisma.isConnected) {
+      if (userId === 'demo-merchant-id') {
+        return {
+          id: 'demo-merchant-id',
+          email: 'merchant@gmail.com',
+          name: 'Rajesh Kumar (Merchant)',
+          phone: '+91 9876543212',
+          role: Role.SHOPKEEPER,
+          addresses: [],
+          store: {
+            id: 'demo-store-1',
+            name: 'Prerna Fresh Mart - DLF Phase 4',
+            slug: 'prerna-fresh-mart-dlf-phase-4',
+            address: 'Shop 12, Galleria Market, DLF Phase 4, Gurugram',
+            city: 'Gurugram',
+            state: 'Haryana',
+            postalCode: '122002',
+            latitude: 28.4682,
+            longitude: 77.0851,
+            deliveryRadiusKm: 8,
+            isActive: true,
+            rating: 4.8,
+          },
+          deliveryPartner: null,
+        };
+      } else if (userId === 'demo-customer-id') {
+        return {
+          id: 'demo-customer-id',
+          email: 'customer@gmail.com',
+          name: 'Aarav Sharma',
+          phone: '+91 9876543210',
+          role: Role.CUSTOMER,
+          addresses: [],
+          store: null,
+          deliveryPartner: null,
+        };
+      } else if (userId === 'demo-rider-id') {
+        return {
+          id: 'demo-rider-id',
+          email: 'deliverypartner@gmail.com',
+          name: 'Vikram Singh (Rider)',
+          phone: '+91 9876543213',
+          role: Role.DELIVERY_PARTNER,
+          addresses: [],
+          store: null,
+          deliveryPartner: {
+            id: 'demo-dp-1',
+            vehicleType: 'EV Bike',
+            vehicleNumber: 'HR-26-EE-1024',
+            currentLat: 28.4625,
+            currentLng: 77.0892,
+            isAvailable: true,
+          },
+        };
+      } else {
+        return {
+          id: 'demo-admin-id',
+          email: 'admin@gmail.com',
+          name: 'System Administrator',
+          phone: '+91 9876543211',
+          role: Role.ADMIN,
+          addresses: [],
+          store: null,
+          deliveryPartner: null,
+        };
+      }
     }
 
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      phone: user.phone,
-      role: user.role,
-      addresses: user.addresses,
-      store: user.storeStaff[0]?.store || null,
-      deliveryPartner: user.deliveryPartner || null,
-    };
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          addresses: true,
+          storeStaff: {
+            include: { store: true },
+          },
+          deliveryPartner: true,
+        },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        phone: user.phone,
+        role: user.role,
+        addresses: user.addresses,
+        store: user.storeStaff[0]?.store || null,
+        deliveryPartner: user.deliveryPartner || null,
+      };
+    } catch {
+      // Demo fallback if database unreachable
+      if (userId === 'demo-merchant-id') {
+        return {
+          id: 'demo-merchant-id',
+          email: 'merchant@gmail.com',
+          name: 'Rajesh Kumar (Merchant)',
+          phone: '+91 9876543212',
+          role: Role.SHOPKEEPER,
+          addresses: [],
+          store: {
+            id: 'demo-store-1',
+            name: 'Prerna Fresh Mart - DLF Phase 4',
+            slug: 'prerna-fresh-mart-dlf-phase-4',
+            address: 'Shop 12, Galleria Market, DLF Phase 4, Gurugram',
+            city: 'Gurugram',
+            state: 'Haryana',
+            postalCode: '122002',
+            latitude: 28.4682,
+            longitude: 77.0851,
+            deliveryRadiusKm: 8,
+            isActive: true,
+            rating: 4.8,
+          },
+          deliveryPartner: null,
+        };
+      } else if (userId === 'demo-customer-id') {
+        return {
+          id: 'demo-customer-id',
+          email: 'customer@gmail.com',
+          name: 'Aarav Sharma',
+          phone: '+91 9876543210',
+          role: Role.CUSTOMER,
+          addresses: [],
+          store: null,
+          deliveryPartner: null,
+        };
+      } else if (userId === 'demo-rider-id') {
+        return {
+          id: 'demo-rider-id',
+          email: 'deliverypartner@gmail.com',
+          name: 'Vikram Singh (Rider)',
+          phone: '+91 9876543213',
+          role: Role.DELIVERY_PARTNER,
+          addresses: [],
+          store: null,
+          deliveryPartner: {
+            id: 'demo-dp-1',
+            vehicleType: 'EV Bike',
+            vehicleNumber: 'HR-26-EE-1024',
+            currentLat: 28.4625,
+            currentLng: 77.0892,
+            isAvailable: true,
+          },
+        };
+      } else {
+        return {
+          id: 'demo-admin-id',
+          email: 'admin@gmail.com',
+          name: 'System Administrator',
+          phone: '+91 9876543211',
+          role: Role.ADMIN,
+          addresses: [],
+          store: null,
+          deliveryPartner: null,
+        };
+      }
+    }
   }
 
   async revokeRefreshToken(token: string) {

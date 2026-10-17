@@ -16,6 +16,7 @@ import {
   ShoppingBag,
   ArrowRight,
   Boxes,
+  MapPin,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/useAuthStore';
@@ -124,6 +125,12 @@ export default function ShopkeeperDashboardPage() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          <Link
+            href="/shopkeeper/store"
+            className="px-4 py-2 bg-white border border-[#F0DEC8] hover:border-[#D9700F] text-[#6B3A0A] rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+          >
+            <MapPin className="w-3.5 h-3.5 text-[#D9700F]" /> Shop Location & Radius
+          </Link>
           <Link
             href="/shopkeeper/products"
             className="px-4 py-2 bg-white border border-[#F0DEC8] hover:border-[#D9700F] text-[#6B3A0A] rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
