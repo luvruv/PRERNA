@@ -193,7 +193,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
         });
       }
     } catch (e) {
-      this.logger.error(`Failed to persist rider location: ${e.message}`);
+      this.logger.error(`Failed to persist rider location: ${(e as any).message}`);
     }
 
     // Broadcast location update to all subscribers in the order room

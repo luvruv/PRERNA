@@ -5,8 +5,18 @@
     "moduleResolution": "node",
     "esModuleInterop": true,
     "strict": true,
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "strictPropertyInitialization": false,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "jsx": "preserve",
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["apps/web/src/*"]
+    },
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   }
 }

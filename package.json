@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
+    "@types/socket.io": "^3.0.1",
     "concurrently": "^9.1.2",
     "dotenv": "^16.4.7",
     "prisma": "^6.3.1",
@@ -28,6 +29,7 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
+    "@nestjs/websockets": "^10.4.22",
     "@prisma/client": "^6.3.1",
     "@types/bcryptjs": "^2.4.6",
     "axios": "^1.20.0",
