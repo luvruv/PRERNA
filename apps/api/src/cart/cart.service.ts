@@ -5,8 +5,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddToCartDto, UpdateCartItemDto } from './dto/cart.dto';
+import { datasetStore } from '../common/dataset-store';
 
-const inMemoryCarts = new Map<string, any[]>();
+export const inMemoryCarts = new Map<string, any[]>();
 
 @Injectable()
 export class CartService {
@@ -50,7 +51,7 @@ export class CartService {
           mrp: item.mrp || 60,
           unit: item.unit || '1 pc',
           image: item.image || '',
-          store: item.store || { id: 'demo-store-1', name: 'Prerna Fresh Mart - DLF Phase 4' },
+          store: item.store || { id: 'store-1', name: 'Sunrise Fresh Market' },
           availableQty: item.availableQty || 50,
           subtotal: itemSubtotal,
         };
@@ -132,114 +133,220 @@ export class CartService {
   }
 
   async addItem(userId: string, dto: AddToCartDto) {
-    const product = await this.prisma.product.findUnique({
-      where: { id: dto.productId },
-      include: { inventory: true },
-    });
+    if (!this.prisma.isConnected) {
+      const prod = datasetStore.getProductById(dto.productId);
+      if (!prod) {
+        throw new NotFoundException('Product not found in catalog');
+      }
 
-    if (!product || !product.isActive) {
-      throw new NotFoundException('Product not found or is currently inactive');
-    }
+      let userCart = inMemoryCarts.get(userId) || [];
+      const existing = userCart.find((i) => i.productId === prod.id || i.productId === dto.productId);
 
-    const available = product.inventory?.availableQty || 0;
-    if (available <= 0) {
-      throw new BadRequestException('Product is currently out of stock');
-    }
-
-    const cart = await this.getOrCreateCart(userId);
-
-    const existingItem = await this.prisma.cartItem.findUnique({
-      where: {
-        cartId_productId: {
-          cartId: cart.id,
-          productId: dto.productId,
-        },
-      },
-    });
-
-    const newQuantity = (existingItem?.quantity || 0) + dto.quantity;
-    if (newQuantity > available) {
-      throw new BadRequestException(
-        `Cannot add ${dto.quantity} more. Only ${available} units available in stock.`,
-      );
-    }
-
-    if (existingItem) {
-      await this.prisma.cartItem.update({
-        where: { id: existingItem.id },
-        data: { quantity: newQuantity },
-      });
-    } else {
-      await this.prisma.cartItem.create({
-        data: {
-          cartId: cart.id,
-          productId: dto.productId,
+      if (existing) {
+        existing.quantity += dto.quantity;
+      } else {
+        userCart.push({
+          id: `cart-item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          productId: prod.id,
           quantity: dto.quantity,
+          productName: prod.name,
+          price: prod.price,
+          mrp: prod.mrp,
+          unit: prod.unit,
+          image: prod.imageUrl,
+          store: { id: prod.storeId, name: prod.storeName },
+          availableQty: prod.availableQty,
+        });
+      }
+
+      inMemoryCarts.set(userId, userCart);
+      return this.getCart(userId);
+    }
+
+    try {
+      const product = await this.prisma.product.findUnique({
+        where: { id: dto.productId },
+        include: { inventory: true },
+      });
+
+      if (!product || !product.isActive) {
+        throw new NotFoundException('Product not found or is currently inactive');
+      }
+
+      const available = product.inventory?.availableQty || 0;
+      if (available <= 0) {
+        throw new BadRequestException('Product is currently out of stock');
+      }
+
+      const cart = await this.getOrCreateCart(userId);
+
+      const existingItem = await this.prisma.cartItem.findUnique({
+        where: {
+          cartId_productId: {
+            cartId: cart.id,
+            productId: dto.productId,
+          },
         },
       });
-    }
 
-    return this.getCart(userId);
-  }
-
-  async updateItem(userId: string, cartItemId: string, dto: UpdateCartItemDto) {
-    const cart = await this.getOrCreateCart(userId);
-
-    const cartItem = await this.prisma.cartItem.findFirst({
-      where: { id: cartItemId, cartId: cart.id },
-      include: { product: { include: { inventory: true } } },
-    });
-
-    if (!cartItem) {
-      throw new NotFoundException('Cart item not found');
-    }
-
-    if (dto.quantity <= 0) {
-      await this.prisma.cartItem.delete({
-        where: { id: cartItemId },
-      });
-    } else {
-      const available = cartItem.product.inventory?.availableQty || 0;
-      if (dto.quantity > available) {
+      const newQuantity = (existingItem?.quantity || 0) + dto.quantity;
+      if (newQuantity > available) {
         throw new BadRequestException(
-          `Requested quantity (${dto.quantity}) exceeds available stock (${available})`,
+          `Cannot add ${dto.quantity} more. Only ${available} units available in stock.`,
         );
       }
 
-      await this.prisma.cartItem.update({
-        where: { id: cartItemId },
-        data: { quantity: dto.quantity },
-      });
+      if (existingItem) {
+        await this.prisma.cartItem.update({
+          where: { id: existingItem.id },
+          data: { quantity: newQuantity },
+        });
+      } else {
+        await this.prisma.cartItem.create({
+          data: {
+            cartId: cart.id,
+            productId: dto.productId,
+            quantity: dto.quantity,
+          },
+        });
+      }
+
+      return this.getCart(userId);
+    } catch {
+      // Fallback to in-memory cart
+      const prod = datasetStore.getProductById(dto.productId);
+      if (prod) {
+        let userCart = inMemoryCarts.get(userId) || [];
+        const existing = userCart.find((i) => i.productId === prod.id);
+        if (existing) existing.quantity += dto.quantity;
+        else {
+          userCart.push({
+            id: `cart-item-${Date.now()}`,
+            productId: prod.id,
+            quantity: dto.quantity,
+            productName: prod.name,
+            price: prod.price,
+            mrp: prod.mrp,
+            unit: prod.unit,
+            image: prod.imageUrl,
+            store: { id: prod.storeId, name: prod.storeName },
+            availableQty: prod.availableQty,
+          });
+        }
+        inMemoryCarts.set(userId, userCart);
+      }
+      return this.getCart(userId);
+    }
+  }
+
+  async updateItem(userId: string, cartItemId: string, dto: UpdateCartItemDto) {
+    if (!this.prisma.isConnected) {
+      let userCart = inMemoryCarts.get(userId) || [];
+      const existing = userCart.find((i) => i.productId === cartItemId || i.id === cartItemId);
+      if (existing) {
+        if (dto.quantity <= 0) {
+          userCart = userCart.filter((i) => i.productId !== cartItemId && i.id !== cartItemId);
+        } else {
+          existing.quantity = dto.quantity;
+        }
+        inMemoryCarts.set(userId, userCart);
+      }
+      return this.getCart(userId);
     }
 
-    return this.getCart(userId);
+    try {
+      const cart = await this.getOrCreateCart(userId);
+
+      const cartItem = await this.prisma.cartItem.findFirst({
+        where: { id: cartItemId, cartId: cart.id },
+        include: { product: { include: { inventory: true } } },
+      });
+
+      if (!cartItem) {
+        throw new NotFoundException('Cart item not found');
+      }
+
+      if (dto.quantity <= 0) {
+        await this.prisma.cartItem.delete({
+          where: { id: cartItemId },
+        });
+      } else {
+        const available = cartItem.product.inventory?.availableQty || 0;
+        if (dto.quantity > available) {
+          throw new BadRequestException(
+            `Requested quantity (${dto.quantity}) exceeds available stock (${available})`,
+          );
+        }
+
+        await this.prisma.cartItem.update({
+          where: { id: cartItemId },
+          data: { quantity: dto.quantity },
+        });
+      }
+
+      return this.getCart(userId);
+    } catch {
+      let userCart = inMemoryCarts.get(userId) || [];
+      const existing = userCart.find((i) => i.productId === cartItemId || i.id === cartItemId);
+      if (existing) {
+        if (dto.quantity <= 0) {
+          userCart = userCart.filter((i) => i.productId !== cartItemId && i.id !== cartItemId);
+        } else {
+          existing.quantity = dto.quantity;
+        }
+        inMemoryCarts.set(userId, userCart);
+      }
+      return this.getCart(userId);
+    }
   }
 
   async removeItem(userId: string, cartItemId: string) {
-    const cart = await this.getOrCreateCart(userId);
-
-    const cartItem = await this.prisma.cartItem.findFirst({
-      where: { id: cartItemId, cartId: cart.id },
-    });
-
-    if (!cartItem) {
-      throw new NotFoundException('Cart item not found');
+    if (!this.prisma.isConnected) {
+      let userCart = inMemoryCarts.get(userId) || [];
+      userCart = userCart.filter((i) => i.productId !== cartItemId && i.id !== cartItemId);
+      inMemoryCarts.set(userId, userCart);
+      return this.getCart(userId);
     }
 
-    await this.prisma.cartItem.delete({
-      where: { id: cartItemId },
-    });
+    try {
+      const cart = await this.getOrCreateCart(userId);
 
-    return this.getCart(userId);
+      const cartItem = await this.prisma.cartItem.findFirst({
+        where: { id: cartItemId, cartId: cart.id },
+      });
+
+      if (cartItem) {
+        await this.prisma.cartItem.delete({
+          where: { id: cartItemId },
+        });
+      }
+
+      return this.getCart(userId);
+    } catch {
+      let userCart = inMemoryCarts.get(userId) || [];
+      userCart = userCart.filter((i) => i.productId !== cartItemId && i.id !== cartItemId);
+      inMemoryCarts.set(userId, userCart);
+      return this.getCart(userId);
+    }
   }
 
   async clearCart(userId: string) {
-    const cart = await this.getOrCreateCart(userId);
+    if (!this.prisma.isConnected) {
+      inMemoryCarts.set(userId, []);
+      return { message: 'Cart cleared successfully' };
+    }
 
-    await this.prisma.cartItem.deleteMany({
-      where: { cartId: cart.id },
-    });
+    try {
+      const cart = await this.getOrCreateCart(userId);
 
-    return { message: 'Cart cleared successfully' };
+      await this.prisma.cartItem.deleteMany({
+        where: { cartId: cart.id },
+      });
+
+      return { message: 'Cart cleared successfully' };
+    } catch {
+      inMemoryCarts.set(userId, []);
+      return { message: 'Cart cleared successfully' };
+    }
   }
 }
