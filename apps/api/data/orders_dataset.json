@@ -1,0 +1,130 @@
+[
+  {
+    "id": "ord-1001",
+    "orderNumber": "PRN-20261019-9182",
+    "timestamp": "2026-10-19T17:36:14.006Z",
+    "customer": {
+      "userId": "usr-customer-1",
+      "name": "Priya Sharma",
+      "email": "customer@prernastore.local",
+      "phone": "+91 99887 76655"
+    },
+    "store": {
+      "storeId": "store-1",
+      "name": "Sunrise Fresh Market",
+      "address": "Shop 14-16, Galleria Market, DLF Phase 4, Gurugram"
+    },
+    "deliveryAddress": {
+      "label": "Home",
+      "street": "Flat 402, Sunshine Heights, DLF Phase 4",
+      "city": "Gurugram",
+      "state": "Haryana",
+      "postalCode": "122009",
+      "latitude": 28.4682,
+      "longitude": 77.0851
+    },
+    "items": [
+      {
+        "productId": "prod-1",
+        "name": "Shimla Fresh Royal Apples",
+        "price": 180,
+        "quantity": 2,
+        "subtotal": 360,
+        "unit": "1 kg (approx 4-5 pcs)"
+      },
+      {
+        "productId": "prod-3",
+        "name": "Amul Taaza Homogenised Toned Milk",
+        "price": 54,
+        "quantity": 3,
+        "subtotal": 162,
+        "unit": "1 L pouch"
+      }
+    ],
+    "billing": {
+      "subtotal": 522,
+      "deliveryFee": 25,
+      "tax": 26.1,
+      "totalAmount": 573.1
+    },
+    "payment": {
+      "transactionId": "TXN_PAY_20261019_8821",
+      "method": "TEST_PAYMENT",
+      "status": "COMPLETED",
+      "paidAt": "2026-10-19T17:37:14.006Z"
+    },
+    "orderStatus": "DELIVERED",
+    "deliveryAssignment": {
+      "riderName": "Vikram Singh (Two Wheeler)",
+      "riderPhone": "+91 98765 43213",
+      "vehicle": "Hero Electric Optima - HR 26 EA 8821",
+      "status": "DELIVERED",
+      "deliveredAt": "2026-10-19T17:49:14.006Z"
+    }
+  },
+  {
+    "id": "ord-1002",
+    "orderNumber": "PRN-20261019-9403",
+    "timestamp": "2026-10-19T18:06:14.006Z",
+    "customer": {
+      "userId": "usr-customer-2",
+      "name": "Prerna Panel Customer",
+      "email": "customer@gmail.com",
+      "phone": "+91 99887 00000"
+    },
+    "store": {
+      "storeId": "store-1",
+      "name": "Sunrise Fresh Market",
+      "address": "Shop 14-16, Galleria Market, DLF Phase 4, Gurugram"
+    },
+    "deliveryAddress": {
+      "label": "Home",
+      "street": "Flat 502, DLF Cyber City Towers, Sector 25",
+      "city": "Gurugram",
+      "state": "Haryana",
+      "postalCode": "122002",
+      "latitude": 28.4682,
+      "longitude": 77.0384
+    },
+    "items": [
+      {
+        "productId": "prod-7",
+        "name": "Aashirvaad Shudh Chakki Atta (10kg)",
+        "price": 435,
+        "quantity": 1,
+        "subtotal": 435,
+        "unit": "10 kg bag"
+      },
+      {
+        "productId": "prod-8",
+        "name": "Lay's India's Magic Masala Chips",
+        "price": 20,
+        "quantity": 4,
+        "subtotal": 80,
+        "unit": "50 g pouch"
+      }
+    ],
+    "billing": {
+      "subtotal": 515,
+      "deliveryFee": 25,
+      "tax": 25.75,
+      "totalAmount": 565.75
+    },
+    "payment": {
+      "transactionId": "TXN_PAY_20261019_9942",
+      "method": "TEST_PAYMENT",
+      "status": "COMPLETED",
+      "paidAt": "2026-10-19T18:07:14.006Z"
+    },
+    "orderStatus": "OUT_FOR_DELIVERY",
+    "deliveryAssignment": {
+      "riderName": "Ramesh Kumar (Electric Bike)",
+      "riderPhone": "+91 91234 99999",
+      "vehicle": "Ather 450X - DL 01 EX 2026",
+      "status": "OUT_FOR_DELIVERY",
+      "currentLat": 28.4645,
+      "currentLng": 77.0345,
+      "estimatedDeliveryMins": 8
+    }
+  }
+]

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role, OrderStatus, DeliveryStatus, Prisma } from '@prisma/client';
+import { datasetStore } from '../common/dataset-store';
 
 @Injectable()
 export class AdminService {
@@ -123,6 +124,29 @@ export class AdminService {
   }
 
   async getOrders(status?: OrderStatus, page = 1, limit = 20) {
+    if (!this.prisma.isConnected) {
+      let orders = datasetStore.getOrders();
+      if (status) orders = orders.filter((o) => o.orderStatus === status);
+      const skip = (page - 1) * limit;
+      return {
+        items: orders.slice(skip, skip + limit).map((o) => ({
+          id: o.id,
+          orderNumber: o.orderNumber,
+          status: o.orderStatus,
+          total: o.billing?.totalAmount || 250,
+          createdAt: o.timestamp,
+          customer: o.customer,
+          store: o.store,
+          deliveryAssignment: o.deliveryAssignment,
+          items: o.items,
+        })),
+        total: orders.length,
+        page,
+        limit,
+        totalPages: Math.ceil(orders.length / limit) || 1,
+      };
+    }
+
     const where: Prisma.OrderWhereInput = {};
     if (status) where.status = status;
 
@@ -152,6 +176,11 @@ export class AdminService {
 
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
+
+  async getAllProducts() {
+    return datasetStore.getProducts();
+  }
+
 
   async getDeliveryPartners() {
     return this.prisma.deliveryPartner.findMany({
