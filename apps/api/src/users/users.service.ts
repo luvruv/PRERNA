@@ -2,6 +2,42 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAddressDto, UpdateProfileDto } from './dto/user.dto';
 
+export const inMemoryAddresses = new Map<string, any[]>([
+  [
+    'demo-customer-id',
+    [
+      {
+        id: 'addr-demo-home',
+        userId: 'demo-customer-id',
+        label: 'Home',
+        street: 'Flat 402, DLF Phase 4, Galleria Road, Sector 28',
+        city: 'Gurugram',
+        state: 'Haryana',
+        postalCode: '122002',
+        latitude: 28.4682,
+        longitude: 77.0851,
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'addr-demo-work',
+        userId: 'demo-customer-id',
+        label: 'Work',
+        street: 'Tower B, DLF Cyber City, Sector 25',
+        city: 'Gurugram',
+        state: 'Haryana',
+        postalCode: '122002',
+        latitude: 28.4905,
+        longitude: 77.0902,
+        isDefault: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
+  ],
+]);
+
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
@@ -82,7 +118,25 @@ export class UsersService {
 
   async getAddresses(userId: string) {
     if (!this.prisma.isConnected) {
-      return [];
+      if (!inMemoryAddresses.has(userId)) {
+        inMemoryAddresses.set(userId, [
+          {
+            id: `addr-${userId}-home`,
+            userId,
+            label: 'Home',
+            street: 'Flat 402, DLF Phase 4, Galleria Road, Sector 28',
+            city: 'Gurugram',
+            state: 'Haryana',
+            postalCode: '122002',
+            latitude: 28.4682,
+            longitude: 77.0851,
+            isDefault: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ]);
+      }
+      return inMemoryAddresses.get(userId) || [];
     }
 
     try {
@@ -91,20 +145,35 @@ export class UsersService {
         orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
       });
     } catch {
-      return [];
+      return inMemoryAddresses.get(userId) || [];
     }
   }
 
   async createAddress(userId: string, dto: CreateAddressDto) {
     if (!this.prisma.isConnected) {
-      return {
-        id: 'addr-demo-1',
+      const list = inMemoryAddresses.get(userId) || [];
+      if (dto.isDefault) {
+        list.forEach((a) => (a.isDefault = false));
+      }
+      const newAddr = {
+        id: `addr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         userId,
-        ...dto,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        label: dto.label || 'Home',
+        street: dto.street,
+        city: dto.city || 'Gurugram',
+        state: dto.state || 'Haryana',
+        postalCode: dto.postalCode || '122001',
+        latitude: (dto as any).latitude || 28.4682,
+        longitude: (dto as any).longitude || 77.0851,
+        isDefault: dto.isDefault ?? list.length === 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
+      list.unshift(newAddr);
+      inMemoryAddresses.set(userId, list);
+      return newAddr;
     }
+
     if (dto.isDefault) {
       await this.prisma.address.updateMany({
         where: { userId },
@@ -129,6 +198,27 @@ export class UsersService {
   }
 
   async updateAddress(userId: string, addressId: string, dto: CreateAddressDto) {
+    if (!this.prisma.isConnected) {
+      const list = inMemoryAddresses.get(userId) || [];
+      const item = list.find((a) => a.id === addressId);
+      if (!item) throw new NotFoundException('Address not found');
+      if (dto.isDefault) {
+        list.forEach((a) => (a.isDefault = false));
+      }
+      Object.assign(item, {
+        label: dto.label ?? item.label,
+        street: dto.street ?? item.street,
+        city: dto.city ?? item.city,
+        state: dto.state ?? item.state,
+        postalCode: dto.postalCode ?? item.postalCode,
+        latitude: (dto as any).latitude ?? item.latitude,
+        longitude: (dto as any).longitude ?? item.longitude,
+        isDefault: dto.isDefault ?? item.isDefault,
+        updatedAt: new Date().toISOString(),
+      });
+      return item;
+    }
+
     const address = await this.prisma.address.findFirst({
       where: { id: addressId, userId },
     });
@@ -158,6 +248,13 @@ export class UsersService {
   }
 
   async deleteAddress(userId: string, addressId: string) {
+    if (!this.prisma.isConnected) {
+      const list = inMemoryAddresses.get(userId) || [];
+      const filtered = list.filter((a) => a.id !== addressId);
+      inMemoryAddresses.set(userId, filtered);
+      return { message: 'Address removed successfully' };
+    }
+
     const address = await this.prisma.address.findFirst({
       where: { id: addressId, userId },
     });
@@ -174,6 +271,14 @@ export class UsersService {
   }
 
   async setDefaultAddress(userId: string, addressId: string) {
+    if (!this.prisma.isConnected) {
+      const list = inMemoryAddresses.get(userId) || [];
+      const item = list.find((a) => a.id === addressId);
+      if (!item) throw new NotFoundException('Address not found');
+      list.forEach((a) => (a.isDefault = a.id === addressId));
+      return item;
+    }
+
     const address = await this.prisma.address.findFirst({
       where: { id: addressId, userId },
     });

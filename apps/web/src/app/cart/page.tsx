@@ -25,26 +25,6 @@ export default function CartPage() {
     fetchCart();
   }, [fetchCart]);
 
-  if (!isAuthenticated) {
-    return (
-      <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-3xl border border-[#F0DEC8] text-center shadow-card space-y-4">
-        <div className="w-16 h-16 rounded-full bg-[#FFF2E5] text-[#D9700F] flex items-center justify-center mx-auto">
-          <ShoppingBag className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-black text-[#6B3A0A]">Sign in to View Your Cart</h2>
-        <p className="text-xs text-[#8C6D53]">
-          Please sign in to access your saved items, addresses and place orders.
-        </p>
-        <Link
-          href="/login"
-          className="inline-block px-6 py-3 bg-[#D9700F] text-white rounded-full font-bold text-xs shadow-md shadow-orange-500/20"
-        >
-          Sign In Now
-        </Link>
-      </div>
-    );
-  }
-
   if (cart.items.length === 0) {
     return (
       <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-3xl border border-[#F0DEC8] text-center shadow-card space-y-4">

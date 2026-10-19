@@ -31,6 +31,14 @@ export class CreateAddressDto {
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean;
+
+  @ApiPropertyOptional({ example: 28.4595 })
+  @IsOptional()
+  latitude?: number;
+
+  @ApiPropertyOptional({ example: 77.0266 })
+  @IsOptional()
+  longitude?: number;
 }
 
 export class UpdateProfileDto {

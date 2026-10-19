@@ -16,6 +16,18 @@ export class CheckoutDto {
   @IsOptional()
   @IsString()
   specialInstructions?: string;
+
+  @ApiPropertyOptional({ description: 'Custom/GPS delivery address payload' })
+  @IsOptional()
+  addressData?: {
+    label?: string;
+    street: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    latitude?: number;
+    longitude?: number;
+  };
 }
 
 export class UpdateOrderStatusDto {

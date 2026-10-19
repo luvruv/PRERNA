@@ -10,6 +10,7 @@ import { CheckoutDto, UpdateOrderStatusDto } from './dto/order.dto';
 import { OrderStatus, PaymentStatus, Role, DeliveryStatus } from '@prisma/client';
 import { datasetStore } from '../common/dataset-store';
 import { inMemoryCarts } from '../cart/cart.service';
+import { inMemoryAddresses } from '../users/users.service';
 
 @Injectable()
 export class OrdersService {
@@ -46,6 +47,42 @@ export class OrdersService {
       const tax = Math.round(subtotal * 0.05 * 100) / 100;
       const totalAmount = Math.round((subtotal + deliveryFee + tax) * 100) / 100;
 
+      let deliveryAddress: any = {
+        label: 'Current GPS Location',
+        street: 'DLF Cyber City, Sector 25',
+        city: 'Gurugram',
+        state: 'Haryana',
+        postalCode: '122002',
+        latitude: 28.4595,
+        longitude: 77.0266,
+      };
+
+      if (dto.addressData) {
+        deliveryAddress = {
+          label: dto.addressData.label || 'Delivery Address',
+          street: dto.addressData.street || 'Selected Delivery Location',
+          city: dto.addressData.city || 'Gurugram',
+          state: dto.addressData.state || 'Haryana',
+          postalCode: dto.addressData.postalCode || '122001',
+          latitude: dto.addressData.latitude || 28.4595,
+          longitude: dto.addressData.longitude || 77.0266,
+        };
+      } else if (dto.addressId && dto.addressId !== 'gps-current') {
+        const userAddresses = inMemoryAddresses.get(userId) || inMemoryAddresses.get('demo-customer-id') || [];
+        const foundAddr = userAddresses.find((a: any) => a.id === dto.addressId);
+        if (foundAddr) {
+          deliveryAddress = {
+            label: foundAddr.label || 'Alternate Address',
+            street: foundAddr.street,
+            city: foundAddr.city || 'Gurugram',
+            state: foundAddr.state || 'Haryana',
+            postalCode: foundAddr.postalCode || '122002',
+            latitude: foundAddr.latitude || 28.4682,
+            longitude: foundAddr.longitude || 77.0851,
+          };
+        }
+      }
+
       const demoOrder = datasetStore.createOrder({
         customer: {
           userId,
@@ -53,15 +90,7 @@ export class OrdersService {
           email: 'customer@gmail.com',
           phone: '+91 99887 00000',
         },
-        deliveryAddress: {
-          label: 'Home',
-          street: 'Flat 502, DLF Cyber City Towers, Sector 25',
-          city: 'Gurugram',
-          state: 'Haryana',
-          postalCode: '122002',
-          latitude: 28.4682,
-          longitude: 77.0384,
-        },
+        deliveryAddress,
         payment: {
           transactionId: `TXN_PAY_${Date.now().toString().slice(-8)}`,
           method: dto.paymentMethod || 'TEST_PAYMENT',
@@ -350,7 +379,16 @@ export class OrdersService {
         })),
         customer: found.customer,
         store: found.store,
-        address: { fullAddress: `${found.deliveryAddress.street}, ${found.deliveryAddress.city}` },
+        address: {
+          label: found.deliveryAddress?.label || 'Delivery Location',
+          street: found.deliveryAddress?.street || 'DLF Cyber City',
+          city: found.deliveryAddress?.city || 'Gurugram',
+          state: found.deliveryAddress?.state || 'Haryana',
+          postalCode: found.deliveryAddress?.postalCode || '122002',
+          latitude: found.deliveryAddress?.latitude || 28.4682,
+          longitude: found.deliveryAddress?.longitude || 77.0384,
+          fullAddress: `${found.deliveryAddress?.street || ''}, ${found.deliveryAddress?.city || ''}`,
+        },
         payment: found.payment,
         deliveryAssignment: {
           deliveryPartner: {

@@ -36,9 +36,7 @@ export default function Navbar() {
   }, [loadProfile, loadStoredLocation]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchCart();
-    }
+    fetchCart();
   }, [isAuthenticated, fetchCart]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
