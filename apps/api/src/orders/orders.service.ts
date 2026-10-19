@@ -9,6 +9,7 @@ import { PaymentService } from './payments/payment.service';
 import { CheckoutDto, UpdateOrderStatusDto } from './dto/order.dto';
 import { OrderStatus, PaymentStatus, Role, DeliveryStatus } from '@prisma/client';
 import { datasetStore } from '../common/dataset-store';
+import { inMemoryCarts } from '../cart/cart.service';
 
 @Injectable()
 export class OrdersService {
@@ -19,6 +20,32 @@ export class OrdersService {
 
   async checkout(userId: string, dto: CheckoutDto) {
     if (!this.prisma.isConnected) {
+      const userCart = inMemoryCarts.get(userId) || [];
+      const items = userCart.length > 0
+        ? userCart.map((i) => ({
+            productId: i.productId,
+            name: i.productName || 'Fresh Item',
+            price: i.price,
+            quantity: i.quantity,
+            subtotal: i.price * i.quantity,
+            unit: i.unit,
+          }))
+        : [
+            {
+              productId: 'prod-1',
+              name: 'Shimla Fresh Royal Apples',
+              price: 180,
+              quantity: 1,
+              subtotal: 180,
+              unit: '1 kg',
+            },
+          ];
+
+      const subtotal = items.reduce((s, it) => s + it.subtotal, 0);
+      const deliveryFee = items.length > 0 ? 25.0 : 0.0;
+      const tax = Math.round(subtotal * 0.05 * 100) / 100;
+      const totalAmount = Math.round((subtotal + deliveryFee + tax) * 100) / 100;
+
       const demoOrder = datasetStore.createOrder({
         customer: {
           userId,
@@ -42,30 +69,16 @@ export class OrdersService {
           paidAt: new Date().toISOString(),
         },
         billing: {
-          subtotal: 198,
-          deliveryFee: 25,
-          tax: 9.9,
-          totalAmount: 232.9,
+          subtotal,
+          deliveryFee,
+          tax,
+          totalAmount,
         },
-        items: [
-          {
-            productId: 'prod-1',
-            name: 'Shimla Fresh Royal Apples',
-            price: 180,
-            quantity: 1,
-            subtotal: 180,
-            unit: '1 kg',
-          },
-          {
-            productId: 'prod-8',
-            name: "Lay's India's Magic Masala Chips",
-            price: 18,
-            quantity: 1,
-            subtotal: 18,
-            unit: '50 g',
-          },
-        ],
+        items,
       });
+
+      // Clear the user's in-memory cart
+      inMemoryCarts.set(userId, []);
 
       return {
         id: demoOrder.id,
