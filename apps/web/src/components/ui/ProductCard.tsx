@@ -42,9 +42,9 @@ export default function ProductCard({ product }: ProductCardProps) {
     if (isOutOfStock || loading) return;
     setLoading(true);
     try {
-      await addItem(product.id, 1);
+      await addItem(product.id, 1, product);
     } catch (err: any) {
-      alert(err.message || 'Could not add to cart');
+      console.warn('Could not add to cart:', err);
     } finally {
       setLoading(false);
     }

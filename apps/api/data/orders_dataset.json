@@ -1,5 +1,249 @@
 [
   {
+    "id": "ord-1792436952120",
+    "orderNumber": "PRN-20261019-7263",
+    "timestamp": "2026-10-19T19:09:12.120Z",
+    "customer": {
+      "userId": "demo-customer-id",
+      "name": "Prerna Panel Customer",
+      "email": "customer@gmail.com",
+      "phone": "+91 99887 00000"
+    },
+    "store": {
+      "storeId": "store-1",
+      "name": "Sunrise Fresh Market",
+      "address": "Shop 14-16, Galleria Market, DLF Phase 4, Gurugram"
+    },
+    "deliveryAddress": {
+      "label": "Other",
+      "street": "Flat 901, Tower C, DLF Cyber City Horizon",
+      "city": "Gurugram",
+      "state": "Haryana",
+      "postalCode": "122002",
+      "latitude": 28.489,
+      "longitude": 77.088
+    },
+    "items": [
+      {
+        "productId": "prod-1",
+        "name": "Shimla Fresh Royal Apples",
+        "price": 180,
+        "quantity": 1,
+        "subtotal": 180,
+        "unit": "1 kg"
+      }
+    ],
+    "billing": {
+      "subtotal": 180,
+      "deliveryFee": 25,
+      "tax": 9,
+      "totalAmount": 214
+    },
+    "payment": {
+      "transactionId": "TXN_PAY_36952120",
+      "method": "COD",
+      "status": "COMPLETED",
+      "paidAt": "2026-10-19T19:09:12.120Z"
+    },
+    "orderStatus": "CONFIRMED",
+    "deliveryAssignment": {
+      "riderName": "Vikram Singh (Electric Bike)",
+      "riderPhone": "+91 98765 43213",
+      "vehicle": "Ather 450X - DL 01 EX 2026",
+      "status": "ASSIGNED",
+      "currentLat": 28.465,
+      "currentLng": 77.0865,
+      "estimatedDeliveryMins": 10
+    }
+  },
+  {
+    "id": "ord-1792436952099",
+    "orderNumber": "PRN-20261019-8909",
+    "timestamp": "2026-10-19T19:09:12.099Z",
+    "customer": {
+      "userId": "demo-customer-id",
+      "name": "Prerna Panel Customer",
+      "email": "customer@gmail.com",
+      "phone": "+91 99887 00000"
+    },
+    "store": {
+      "storeId": "store-1",
+      "name": "Sunrise Fresh Market",
+      "address": "Shop 14-16, Galleria Market, DLF Phase 4, Gurugram"
+    },
+    "deliveryAddress": {
+      "label": "Current GPS Location",
+      "street": "DLF Cyber City, Sector 25, Gurugram, Haryana",
+      "city": "Gurugram",
+      "state": "Haryana",
+      "postalCode": "122002",
+      "latitude": 28.4595,
+      "longitude": 77.0266
+    },
+    "items": [
+      {
+        "productId": "prod-2",
+        "name": "Robusta Yellow Bananas",
+        "price": 48,
+        "quantity": 2,
+        "subtotal": 96,
+        "unit": "1 kg (approx 6 pcs)"
+      }
+    ],
+    "billing": {
+      "subtotal": 96,
+      "deliveryFee": 25,
+      "tax": 4.8,
+      "totalAmount": 125.8
+    },
+    "payment": {
+      "transactionId": "TXN_PAY_36952099",
+      "method": "COD",
+      "status": "COMPLETED",
+      "paidAt": "2026-10-19T19:09:12.099Z"
+    },
+    "orderStatus": "CONFIRMED",
+    "deliveryAssignment": {
+      "riderName": "Vikram Singh (Electric Bike)",
+      "riderPhone": "+91 98765 43213",
+      "vehicle": "Ather 450X - DL 01 EX 2026",
+      "status": "ASSIGNED",
+      "currentLat": 28.465,
+      "currentLng": 77.0865,
+      "estimatedDeliveryMins": 10
+    }
+  },
+  {
+    "id": "ord-1792436909106",
+    "orderNumber": "PRN-20261019-3834",
+    "timestamp": "2026-10-19T19:08:29.106Z",
+    "customer": {
+      "userId": "demo-customer-id",
+      "name": "Prerna Panel Customer",
+      "email": "customer@gmail.com",
+      "phone": "+91 99887 00000"
+    },
+    "store": {
+      "storeId": "store-1",
+      "name": "Sunrise Fresh Market",
+      "address": "Shop 14-16, Galleria Market, DLF Phase 4, Gurugram"
+    },
+    "deliveryAddress": {
+      "label": "Home",
+      "street": "Flat 502, DLF Cyber City Towers, Sector 25",
+      "city": "Gurugram",
+      "state": "Haryana",
+      "postalCode": "122002",
+      "latitude": 28.4682,
+      "longitude": 77.0384
+    },
+    "items": [
+      {
+        "productId": "prod-1",
+        "name": "Shimla Fresh Royal Apples",
+        "price": 180,
+        "quantity": 1,
+        "subtotal": 180,
+        "unit": "1 kg (approx 4-5 pcs)"
+      },
+      {
+        "productId": "prod-2",
+        "name": "Robusta Yellow Bananas",
+        "price": 48,
+        "quantity": 2,
+        "subtotal": 96,
+        "unit": "1 kg (approx 6 pcs)"
+      }
+    ],
+    "billing": {
+      "subtotal": 276,
+      "deliveryFee": 25,
+      "tax": 13.8,
+      "totalAmount": 314.8
+    },
+    "payment": {
+      "transactionId": "TXN_PAY_36909106",
+      "method": "COD",
+      "status": "COMPLETED",
+      "paidAt": "2026-10-19T19:08:29.106Z"
+    },
+    "orderStatus": "CONFIRMED",
+    "deliveryAssignment": {
+      "riderName": "Vikram Singh (Electric Bike)",
+      "riderPhone": "+91 98765 43213",
+      "vehicle": "Ather 450X - DL 01 EX 2026",
+      "status": "ASSIGNED",
+      "currentLat": 28.465,
+      "currentLng": 77.0865,
+      "estimatedDeliveryMins": 10
+    }
+  },
+  {
+    "id": "ord-1792436018134",
+    "orderNumber": "PRN-20261019-3928",
+    "timestamp": "2026-10-19T18:53:38.134Z",
+    "customer": {
+      "userId": "demo-customer-id",
+      "name": "Prerna Panel Customer",
+      "email": "customer@gmail.com",
+      "phone": "+91 99887 00000"
+    },
+    "store": {
+      "storeId": "store-1",
+      "name": "Sunrise Fresh Market",
+      "address": "Shop 14-16, Galleria Market, DLF Phase 4, Gurugram"
+    },
+    "deliveryAddress": {
+      "label": "Home",
+      "street": "Flat 502, DLF Cyber City Towers, Sector 25",
+      "city": "Gurugram",
+      "state": "Haryana",
+      "postalCode": "122002",
+      "latitude": 28.4682,
+      "longitude": 77.0384
+    },
+    "items": [
+      {
+        "productId": "prod-1",
+        "name": "Shimla Fresh Royal Apples",
+        "price": 180,
+        "quantity": 2,
+        "subtotal": 360,
+        "unit": "1 kg (approx 4-5 pcs)"
+      },
+      {
+        "productId": "prod-3",
+        "name": "Fresh Nagpur Oranges",
+        "price": 95,
+        "quantity": 3,
+        "subtotal": 285,
+        "unit": "1 kg"
+      }
+    ],
+    "billing": {
+      "subtotal": 645,
+      "deliveryFee": 25,
+      "tax": 32.25,
+      "totalAmount": 702.25
+    },
+    "payment": {
+      "transactionId": "TXN_PAY_36018134",
+      "method": "TEST_PAYMENT",
+      "status": "COMPLETED",
+      "paidAt": "2026-10-19T18:53:38.134Z"
+    },
+    "orderStatus": "CONFIRMED",
+    "deliveryAssignment": {
+      "riderName": "Vikram Singh (Electric Bike)",
+      "riderPhone": "+91 98765 43213",
+      "vehicle": "Ather 450X - DL 01 EX 2026",
+      "status": "ASSIGNED",
+      "currentLat": 28.465,
+      "currentLng": 77.0865,
+      "estimatedDeliveryMins": 10
+    }
+  },
+  {
     "id": "ord-1001",
     "orderNumber": "PRN-20261019-9182",
     "timestamp": "2026-10-19T17:36:14.006Z",

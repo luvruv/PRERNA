@@ -13,7 +13,7 @@
     "mrp": 220,
     "unit": "1 kg (approx 4-5 pcs)",
     "sku": "FRU-APP-001",
-    "availableQty": 45,
+    "availableQty": 49,
     "reservedQty": 0,
     "lowStockThreshold": 10,
     "stockStatus": "IN_STOCK",
@@ -21,7 +21,7 @@
     "imageUrl": "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=600&q=80",
     "rating": 4.5,
     "createdAt": "2026-10-11T02:21:14.005Z",
-    "updatedAt": "2026-10-19T18:21:14.006Z"
+    "updatedAt": "2026-10-19T19:09:12.120Z"
   },
   {
     "id": "prod-2",
@@ -37,7 +37,7 @@
     "mrp": 60,
     "unit": "1 kg (approx 6 pcs)",
     "sku": "FRU-BAN-002",
-    "availableQty": 80,
+    "availableQty": 84,
     "reservedQty": 0,
     "lowStockThreshold": 10,
     "stockStatus": "IN_STOCK",
@@ -45,7 +45,7 @@
     "imageUrl": "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&w=600&q=80",
     "rating": 4.6,
     "createdAt": "2026-10-11T03:21:14.006Z",
-    "updatedAt": "2026-10-19T18:21:14.006Z"
+    "updatedAt": "2026-10-19T19:09:12.099Z"
   },
   {
     "id": "prod-3",
@@ -61,7 +61,7 @@
     "mrp": 120,
     "unit": "1 kg",
     "sku": "FRU-ORA-003",
-    "availableQty": 35,
+    "availableQty": 38,
     "reservedQty": 0,
     "lowStockThreshold": 10,
     "stockStatus": "IN_STOCK",
@@ -69,7 +69,7 @@
     "imageUrl": "https://images.unsplash.com/photo-1582979512210-99b6a53386f9?auto=format&fit=crop&w=600&q=80",
     "rating": 4.7,
     "createdAt": "2026-10-11T04:21:14.006Z",
-    "updatedAt": "2026-10-19T18:21:14.006Z"
+    "updatedAt": "2026-10-19T18:53:38.136Z"
   },
   {
     "id": "prod-4",
