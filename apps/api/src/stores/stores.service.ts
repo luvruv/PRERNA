@@ -1,65 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-
-const fallbackDemoStores = [
-  {
-    id: 'demo-store-1',
-    name: 'Prerna Fresh Mart - DLF Phase 4',
-    slug: 'prerna-fresh-mart-dlf-phase-4',
-    description: 'Fresh vegetables, dairy, farm fruits & daily essentials',
-    address: 'Shop 12, Galleria Market, DLF Phase 4, Gurugram',
-    city: 'Gurugram',
-    state: 'Haryana',
-    postalCode: '122002',
-    phone: '+91 9876543212',
-    latitude: 28.4682,
-    longitude: 77.0851,
-    deliveryRadiusKm: 8.0,
-    isActive: true,
-    rating: 4.8,
-    bannerUrl: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=800&q=80',
-    logoUrl: null,
-    _count: { products: 72 },
-  },
-  {
-    id: 'demo-store-2',
-    name: 'Prerna Organic & Daily - Sector 14',
-    slug: 'prerna-organic-daily-sector-14',
-    description: 'Certified organic vegetables, cold-pressed oils & whole grains',
-    address: 'SCF 45, Sector 14 Main Market, Gurugram',
-    city: 'Gurugram',
-    state: 'Haryana',
-    postalCode: '122001',
-    phone: '+91 9876543214',
-    latitude: 28.4721,
-    longitude: 77.0428,
-    deliveryRadiusKm: 6.0,
-    isActive: true,
-    rating: 4.6,
-    bannerUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80',
-    logoUrl: null,
-    _count: { products: 68 },
-  },
-  {
-    id: 'demo-store-3',
-    name: 'Prerna Super Express - Golf Course Rd',
-    slug: 'prerna-super-express-golf-course',
-    description: '10-minute lightning delivery hub for DLF 5, Horizon & Mega Mall',
-    address: 'Lower Ground, Mega Mall, Golf Course Road, Gurugram',
-    city: 'Gurugram',
-    state: 'Haryana',
-    postalCode: '122002',
-    phone: '+91 9876543215',
-    latitude: 28.4412,
-    longitude: 77.1025,
-    deliveryRadiusKm: 10.0,
-    isActive: true,
-    rating: 4.9,
-    bannerUrl: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&w=800&q=80',
-    logoUrl: null,
-    _count: { products: 68 },
-  },
-];
+import { datasetStore } from '../common/dataset-store';
 
 @Injectable()
 export class StoresService {
@@ -67,7 +8,7 @@ export class StoresService {
 
   async findAll() {
     if (!this.prisma.isConnected) {
-      return fallbackDemoStores;
+      return datasetStore.getStores();
     }
 
     try {
@@ -81,21 +22,49 @@ export class StoresService {
         orderBy: { rating: 'desc' },
       });
     } catch {
-      return fallbackDemoStores;
+      return datasetStore.getStores();
     }
   }
 
   async findById(id: string) {
+    const store = datasetStore.getStoreById(id);
     if (!this.prisma.isConnected) {
-      const fallback = fallbackDemoStores.find((s) => s.id === id || s.slug === id);
-      if (!fallback) {
+      if (!store) {
         throw new NotFoundException('Store not found');
       }
-      return { ...fallback, products: [] };
+      const storeProducts = datasetStore
+        .getProducts()
+        .filter((p) => p.storeId === store.id)
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          description: p.description,
+          price: p.price,
+          mrp: p.mrp,
+          unit: p.unit,
+          sku: p.sku,
+          isActive: p.isActive,
+          images: [{ id: `img-${p.id}`, url: p.imageUrl, isPrimary: true }],
+          inventory: {
+            id: `inv-${p.id}`,
+            availableQty: p.availableQty,
+            lowStockThreshold: p.lowStockThreshold,
+          },
+          category: {
+            id: p.categoryId,
+            name: p.categoryName,
+          },
+        }));
+
+      return {
+        ...store,
+        products: storeProducts,
+      };
     }
 
     try {
-      const store = await this.prisma.store.findFirst({
+      const dbStore = await this.prisma.store.findFirst({
         where: {
           OR: [{ id }, { slug: id }],
         },
@@ -111,16 +80,15 @@ export class StoresService {
         },
       });
 
-      if (store) return store;
+      if (dbStore) return dbStore;
     } catch {
       // ignore
     }
 
-    const fallback = fallbackDemoStores.find((s) => s.id === id || s.slug === id);
-    if (!fallback) {
+    if (!store) {
       throw new NotFoundException('Store not found');
     }
-    return { ...fallback, products: [] };
+    return { ...store, products: [] };
   }
 
   async findBySlug(slug: string) {
@@ -135,7 +103,7 @@ export class StoresService {
   ) {
     let stores: any[] = [];
     if (!this.prisma.isConnected) {
-      stores = fallbackDemoStores;
+      stores = datasetStore.getStores();
     } else {
       try {
         stores = await this.prisma.store.findMany({
@@ -147,7 +115,7 @@ export class StoresService {
           },
         });
       } catch {
-        stores = fallbackDemoStores;
+        stores = datasetStore.getStores();
       }
     }
 
@@ -189,4 +157,3 @@ export class StoresService {
     return result;
   }
 }
-

@@ -61,6 +61,12 @@ export class AdminController {
     return this.adminService.getOrders(status, p, l);
   }
 
+  @Get('products')
+  @ApiOperation({ summary: 'List all products with stock quantities and central dataset view' })
+  async getProducts() {
+    return this.adminService.getAllProducts();
+  }
+
   @Get('delivery-partners')
   @ApiOperation({ summary: 'List all registered delivery partners' })
   async getDeliveryPartners() {

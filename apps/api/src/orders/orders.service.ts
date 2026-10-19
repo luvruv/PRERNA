@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PaymentService } from './payments/payment.service';
 import { CheckoutDto, UpdateOrderStatusDto } from './dto/order.dto';
 import { OrderStatus, PaymentStatus, Role, DeliveryStatus } from '@prisma/client';
+import { datasetStore } from '../common/dataset-store';
 
 @Injectable()
 export class OrdersService {
@@ -17,6 +18,66 @@ export class OrdersService {
   ) {}
 
   async checkout(userId: string, dto: CheckoutDto) {
+    if (!this.prisma.isConnected) {
+      const demoOrder = datasetStore.createOrder({
+        customer: {
+          userId,
+          name: 'Prerna Panel Customer',
+          email: 'customer@gmail.com',
+          phone: '+91 99887 00000',
+        },
+        deliveryAddress: {
+          label: 'Home',
+          street: 'Flat 502, DLF Cyber City Towers, Sector 25',
+          city: 'Gurugram',
+          state: 'Haryana',
+          postalCode: '122002',
+          latitude: 28.4682,
+          longitude: 77.0384,
+        },
+        payment: {
+          transactionId: `TXN_PAY_${Date.now().toString().slice(-8)}`,
+          method: dto.paymentMethod || 'TEST_PAYMENT',
+          status: 'COMPLETED',
+          paidAt: new Date().toISOString(),
+        },
+        billing: {
+          subtotal: 198,
+          deliveryFee: 25,
+          tax: 9.9,
+          totalAmount: 232.9,
+        },
+        items: [
+          {
+            productId: 'prod-1',
+            name: 'Shimla Fresh Royal Apples',
+            price: 180,
+            quantity: 1,
+            subtotal: 180,
+            unit: '1 kg',
+          },
+          {
+            productId: 'prod-8',
+            name: "Lay's India's Magic Masala Chips",
+            price: 18,
+            quantity: 1,
+            subtotal: 18,
+            unit: '50 g',
+          },
+        ],
+      });
+
+      return {
+        id: demoOrder.id,
+        orderNumber: demoOrder.orderNumber,
+        status: demoOrder.orderStatus,
+        total: demoOrder.billing.totalAmount,
+        payment: demoOrder.payment,
+        deliveryAssignment: demoOrder.deliveryAssignment,
+        createdAt: demoOrder.timestamp,
+      };
+    }
+
     // 1. Verify address
     const address = await this.prisma.address.findFirst({
       where: { id: dto.addressId, userId },
@@ -184,12 +245,36 @@ export class OrdersService {
 
   async findCustomerOrders(userId: string, page = 1, limit = 10) {
     if (!this.prisma.isConnected) {
+      const allOrders = datasetStore.getOrders();
+      const skip = (page - 1) * limit;
+      const items = allOrders.slice(skip, skip + limit).map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.orderStatus,
+        total: o.billing?.totalAmount || 250,
+        createdAt: o.timestamp,
+        store: o.store,
+        address: o.deliveryAddress,
+        items: o.items.map((i) => ({
+          id: `item-${i.productId}`,
+          quantity: i.quantity,
+          price: i.price,
+          product: { name: i.name, images: [] },
+        })),
+        payment: o.payment,
+        deliveryAssignment: o.deliveryAssignment,
+        statusHistory: [
+          { status: 'CONFIRMED', createdAt: o.timestamp },
+          { status: o.orderStatus, createdAt: o.timestamp },
+        ],
+      }));
+
       return {
-        items: [],
-        total: 0,
+        items,
+        total: allOrders.length,
         page,
         limit,
-        totalPages: 0,
+        totalPages: Math.ceil(allOrders.length / limit) || 1,
       };
     }
 
@@ -237,21 +322,30 @@ export class OrdersService {
 
   async findOrderById(orderId: string, currentUser?: { id: string; role: Role }) {
     if (!this.prisma.isConnected) {
+      const found = datasetStore.getOrderById(orderId) || datasetStore.getOrders()[0];
       return {
-        id: orderId,
-        orderNumber: `ORD-98214`,
-        status: OrderStatus.OUT_FOR_DELIVERY,
-        total: 285.0,
-        items: [],
-        customer: { id: 'demo-customer-id', name: 'Aarav Sharma', phone: '+91 9876543210', email: 'customer@gmail.com' },
-        store: { id: 'demo-store-1', name: 'Prerna Fresh Mart - DLF Phase 4', address: 'Galleria Market, DLF 4, Gurugram' },
-        address: { fullAddress: 'Flat 402, Sunshine Heights, DLF Phase 4, Gurugram' },
+        id: found.id,
+        orderNumber: found.orderNumber,
+        status: found.orderStatus,
+        total: found.billing?.totalAmount || 285.0,
+        createdAt: found.timestamp,
+        items: found.items.map((i) => ({
+          id: `item-${i.productId}`,
+          quantity: i.quantity,
+          price: i.price,
+          product: { name: i.name, images: [] },
+        })),
+        customer: found.customer,
+        store: found.store,
+        address: { fullAddress: `${found.deliveryAddress.street}, ${found.deliveryAddress.city}` },
+        payment: found.payment,
         deliveryAssignment: {
           deliveryPartner: {
-            user: { name: 'Vikram Singh', phone: '+91 9876543213' },
-            currentLat: 28.4650,
-            currentLng: 77.0865,
+            user: { name: found.deliveryAssignment?.riderName || 'Vikram Singh', phone: found.deliveryAssignment?.riderPhone || '+91 9876543213' },
+            currentLat: found.deliveryAssignment?.currentLat || 28.465,
+            currentLng: found.deliveryAssignment?.currentLng || 77.0865,
           },
+          status: found.deliveryAssignment?.status || 'OUT_FOR_DELIVERY',
         },
       };
     }

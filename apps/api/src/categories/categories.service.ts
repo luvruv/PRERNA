@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { datasetStore } from '../common/dataset-store';
 
 const fallbackCategories = [
   { id: 'cat-1', name: 'Fresh Fruits', slug: 'fresh-fruits', description: 'Sweet, juicy and farm-picked fresh fruits', imageUrl: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?auto=format&fit=crop&w=400&q=80', sortOrder: 1, _count: { products: 16 } },
@@ -48,7 +49,37 @@ export class CategoriesService {
       if (!fallback) {
         throw new NotFoundException('Category not found');
       }
-      return { ...fallback, products: [] };
+
+      // Populate with products from datasetStore for this category
+      const categoryProducts = datasetStore
+        .getProducts()
+        .filter((p) => p.categorySlug === fallback.slug || p.categoryId === fallback.id)
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          description: p.description,
+          price: p.price,
+          mrp: p.mrp,
+          unit: p.unit,
+          sku: p.sku,
+          isActive: p.isActive,
+          images: [{ id: `img-${p.id}`, url: p.imageUrl, isPrimary: true }],
+          inventory: {
+            id: `inv-${p.id}`,
+            availableQty: p.availableQty,
+            lowStockThreshold: p.lowStockThreshold,
+          },
+          store: {
+            id: p.storeId,
+            name: p.storeName,
+          },
+        }));
+
+      return {
+        ...fallback,
+        products: categoryProducts,
+      };
     }
 
     try {
@@ -76,9 +107,34 @@ export class CategoriesService {
       throw new NotFoundException('Category not found');
     }
 
+    const categoryProducts = datasetStore
+      .getProducts()
+      .filter((p) => p.categorySlug === fallback.slug || p.categoryId === fallback.id)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        description: p.description,
+        price: p.price,
+        mrp: p.mrp,
+        unit: p.unit,
+        sku: p.sku,
+        isActive: p.isActive,
+        images: [{ id: `img-${p.id}`, url: p.imageUrl, isPrimary: true }],
+        inventory: {
+          id: `inv-${p.id}`,
+          availableQty: p.availableQty,
+          lowStockThreshold: p.lowStockThreshold,
+        },
+        store: {
+          id: p.storeId,
+          name: p.storeName,
+        },
+      }));
+
     return {
       ...fallback,
-      products: [],
+      products: categoryProducts,
     };
   }
 }
