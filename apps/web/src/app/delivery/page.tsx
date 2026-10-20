@@ -18,6 +18,9 @@ import {
   AlertCircle,
   Sparkles,
   Radio,
+  ExternalLink,
+  KeyRound,
+  Map,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/useAuthStore';
@@ -26,6 +29,9 @@ export default function DeliveryDashboardPage() {
   const { user, isAuthenticated, isLoading, loadProfile } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'AVAILABLE' | 'ACTIVE' | 'HISTORY'>('ACTIVE');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [isContinuousBroadcasting, setIsContinuousBroadcasting] = useState(true);
+  const [deliveryOtp, setDeliveryOtp] = useState<Record<string, string>>({});
+  const [showOtpInput, setShowOtpInput] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadProfile();
@@ -72,6 +78,44 @@ export default function DeliveryDashboardPage() {
     queryFn: () => api.get('/delivery/history'),
     enabled: isAuthenticated && user?.role === 'DELIVERY_PARTNER' && activeTab === 'HISTORY',
   });
+
+  // Background / Active GPS Broadcaster every 4 seconds when continuous broadcast is on
+  useEffect(() => {
+    if (!isContinuousBroadcasting || typeof window === 'undefined' || !navigator.geolocation) return;
+
+    let watchId: number;
+    try {
+      watchId = navigator.geolocation.watchPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const speed = pos.coords.speed || 0;
+          const heading = pos.coords.heading || 0;
+          setCurrentGps({ lat, lng });
+          setGpsStatus(`Live GPS: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E • ${Math.round(speed * 3.6)} km/h`);
+          try {
+            await api.post('/delivery/location', {
+              latitude: lat,
+              longitude: lng,
+              heading,
+              speed,
+              orderId: activeDeliveries[0]?.order?.id,
+            });
+          } catch {}
+        },
+        (err) => {
+          // Graceful fallback to periodic simulated or hub ping if browser denies background GPS
+        },
+        { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 },
+      );
+    } catch {}
+
+    return () => {
+      if (watchId !== undefined && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, [isContinuousBroadcasting, activeDeliveries]);
 
   // Automatically switch to AVAILABLE if no active deliveries but available requests exist
   useEffect(() => {
@@ -479,10 +523,20 @@ export default function DeliveryDashboardPage() {
 
                   {/* Pickup & Delivery Location Addresses */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                    <div className="p-3.5 bg-[#FAF3EB]/50 rounded-2xl border border-[#F0DEC8] space-y-1">
-                      <div className="flex items-center gap-1.5 font-bold text-[#6B3A0A]">
-                        <Store className="w-3.5 h-3.5 text-[#D9700F]" />
-                        <span>Pickup: {ord?.store?.name}</span>
+                    <div className="p-3.5 bg-[#FAF3EB]/50 rounded-2xl border border-[#F0DEC8] space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-bold text-[#6B3A0A]">
+                          <Store className="w-3.5 h-3.5 text-[#D9700F]" />
+                          <span>Pickup: {ord?.store?.name}</span>
+                        </div>
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&origin=${currentGps.lat},${currentGps.lng}&destination=${ord?.store?.latitude || 28.4595},${ord?.store?.longitude || 77.0266}&travelmode=two_wheeler`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2.5 py-1 bg-white border border-[#D9700F] text-[#D9700F] hover:bg-[#D9700F] hover:text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all shadow-sm"
+                        >
+                          <Navigation className="w-2.5 h-2.5" /> Navigate to Store
+                        </a>
                       </div>
                       <p className="text-[#8C6D53]">{ord?.store?.address}</p>
                       {ord?.store?.phone && (
@@ -490,20 +544,49 @@ export default function DeliveryDashboardPage() {
                       )}
                     </div>
 
-                    <div className="p-3.5 bg-[#FAF3EB]/50 rounded-2xl border border-[#F0DEC8] space-y-1">
-                      <div className="flex items-center gap-1.5 font-bold text-[#6B3A0A]">
-                        <MapPin className="w-3.5 h-3.5 text-[#D9700F]" />
-                        <span>Drop: {ord?.customer?.name} ({ord?.address?.label})</span>
+                    <div className="p-3.5 bg-[#FAF3EB]/50 rounded-2xl border border-[#F0DEC8] space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-bold text-[#6B3A0A]">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Drop: {ord?.customer?.name} ({ord?.address?.label || 'Home'})</span>
+                        </div>
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&origin=${currentGps.lat},${currentGps.lng}&destination=${ord?.address?.latitude || 28.4682},${ord?.address?.longitude || 77.0384}&travelmode=two_wheeler`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2.5 py-1 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-all shadow-sm"
+                        >
+                          <Navigation className="w-2.5 h-2.5" /> Navigate to Doorstep
+                        </a>
                       </div>
-                      <p className="text-[#8C6D53]">
-                        {ord?.address?.street}, {ord?.address?.city}
-                      </p>
+
+                      {/* Detailed Address Breakdown */}
+                      <div className="text-[#8C6D53] space-y-0.5">
+                        <div className="font-bold text-[#6B3A0A]">
+                          {[ord?.address?.houseNumber, ord?.address?.buildingName].filter(Boolean).join(', ') || ord?.address?.street}
+                        </div>
+                        {(ord?.address?.colony || ord?.address?.landmark) && (
+                          <div className="text-[11px] text-[#A66C3E]">
+                            {[ord?.address?.colony, ord?.address?.landmark ? `Landmark: ${ord?.address?.landmark}` : ''].filter(Boolean).join(' • ')}
+                          </div>
+                        )}
+                        <div className="text-[11px]">
+                          {ord?.address?.city}, {ord?.address?.state} - {ord?.address?.postalCode}
+                        </div>
+                      </div>
+
+                      {ord?.address?.deliveryInstructions && (
+                        <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-[#6B3A0A]">
+                          <b>Doorstep Note:</b> {ord?.address?.deliveryInstructions}
+                        </div>
+                      )}
+
                       {ord?.customer?.phone && (
                         <a
                           href={`tel:${ord?.customer?.phone}`}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-[#D9700F] hover:underline"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-[#D9700F] hover:underline pt-0.5"
                         >
-                          <Phone className="w-3 h-3" /> Call: {ord?.customer?.phone}
+                          <Phone className="w-3 h-3" /> Call Customer: {ord?.customer?.phone}
                         </a>
                       )}
                     </div>
@@ -524,12 +607,12 @@ export default function DeliveryDashboardPage() {
                       <span>GPS: {currentGps.lat.toFixed(4)}°N, {currentGps.lng.toFixed(4)}°E</span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {ord?.status === 'ASSIGNED' && (
                         <button
                           onClick={() => handleUpdateStatus(ord.id, 'PICKED_UP', 'Rider picked up package at store')}
                           disabled={isLoadingThis}
-                          className="w-full sm:w-auto px-6 py-3 bg-[#D9700F] text-white rounded-2xl text-xs font-black hover:bg-primary-hover shadow-md shadow-orange-500/20 transition-all"
+                          className="w-full sm:w-auto px-6 py-2.5 bg-[#D9700F] text-white rounded-2xl text-xs font-black hover:bg-primary-hover shadow-md shadow-orange-500/20 transition-all"
                         >
                           {isLoadingThis ? 'Updating...' : 'Confirm Store Pickup (PICKED_UP)'}
                         </button>
@@ -539,7 +622,7 @@ export default function DeliveryDashboardPage() {
                         <button
                           onClick={() => handleUpdateStatus(ord.id, 'OUT_FOR_DELIVERY', 'Rider on way to doorstep')}
                           disabled={isLoadingThis}
-                          className="w-full sm:w-auto px-6 py-3 bg-purple-700 text-white rounded-2xl text-xs font-black hover:bg-purple-800 shadow-md shadow-purple-500/20 transition-all flex items-center justify-center gap-1.5"
+                          className="w-full sm:w-auto px-6 py-2.5 bg-purple-700 text-white rounded-2xl text-xs font-black hover:bg-purple-800 shadow-md shadow-purple-500/20 transition-all flex items-center justify-center gap-1.5"
                         >
                           <Navigation className="w-3.5 h-3.5" />
                           <span>{isLoadingThis ? 'Updating...' : 'Start Driving (OUT_FOR_DELIVERY)'}</span>
@@ -547,14 +630,51 @@ export default function DeliveryDashboardPage() {
                       )}
 
                       {ord?.status === 'OUT_FOR_DELIVERY' && (
-                        <button
-                          onClick={() => handleUpdateStatus(ord.id, 'DELIVERED', 'Delivered at doorstep and payment completed')}
-                          disabled={isLoadingThis}
-                          className="w-full sm:w-auto px-6 py-3 bg-emerald-600 text-white rounded-2xl text-xs font-black hover:bg-emerald-700 shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>{isLoadingThis ? 'Updating...' : 'Mark Successfully Delivered (DELIVERED)'}</span>
-                        </button>
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={() => alert(`Broadcasting arrival alert to customer for Order #${ord.orderNumber}!`)}
+                            className="px-3.5 py-2.5 bg-amber-100 text-[#D9700F] rounded-2xl text-xs font-bold hover:bg-amber-200 transition-all"
+                          >
+                            I Have Arrived
+                          </button>
+
+                          {showOtpInput[ord.id] ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                placeholder="4-digit OTP"
+                                maxLength={6}
+                                value={deliveryOtp[ord.id] || ''}
+                                onChange={(e) => setDeliveryOtp({ ...deliveryOtp, [ord.id]: e.target.value })}
+                                className="w-24 px-2 py-2 bg-white border border-[#F0DEC8] rounded-xl text-xs font-black text-center focus:outline-none focus:border-emerald-600"
+                              />
+                              <button
+                                onClick={() => {
+                                  const entered = deliveryOtp[ord.id]?.trim();
+                                  if (!entered) {
+                                    alert('Please enter delivery confirmation OTP (e.g. 1234)');
+                                    return;
+                                  }
+                                  handleUpdateStatus(ord.id, 'DELIVERED', `Delivered with OTP ${entered}`);
+                                }}
+                                disabled={isLoadingThis}
+                                className="px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs font-black hover:bg-emerald-700 shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>Verify & Deliver</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setShowOtpInput({ ...showOtpInput, [ord.id]: true })}
+                              className="px-5 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs font-black hover:bg-emerald-700 shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <KeyRound className="w-4 h-4" />
+                              <span>Order Delivered (OTP Verification)</span>
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

@@ -171,7 +171,7 @@ export class DeliveryService {
   }
 
   // 4. Update live GPS coordinates of rider
-  async updateLocation(userId: string, latitude: number, longitude: number, orderId?: string) {
+  async updateLocation(userId: string, latitude: number, longitude: number, orderId?: string, heading: number = 0, speed: number = 0) {
     const partner = await this.getDeliveryPartnerProfile(userId);
 
     // Update partner coordinates
@@ -183,6 +183,22 @@ export class DeliveryService {
         lastLocationAt: new Date(),
       },
     });
+
+    // Record in location history
+    try {
+      await this.prisma.driverLocationHistory.create({
+        data: {
+          driverId: userId,
+          orderId: orderId || null,
+          latitude,
+          longitude,
+          heading,
+          speed,
+        },
+      });
+    } catch (e) {
+      // non-blocking for logging
+    }
 
     // Also update any active delivery assignments for this rider
     if (orderId) {
@@ -197,6 +213,8 @@ export class DeliveryService {
       this.trackingGateway.broadcastRiderLocation(orderId, {
         latitude,
         longitude,
+        heading,
+        speed,
         updatedAt: new Date().toISOString(),
       });
     } else {
@@ -222,6 +240,8 @@ export class DeliveryService {
         this.trackingGateway.broadcastRiderLocation(assign.orderId, {
           latitude,
           longitude,
+          heading,
+          speed,
           updatedAt: new Date().toISOString(),
         });
       }
@@ -231,6 +251,8 @@ export class DeliveryService {
       success: true,
       latitude,
       longitude,
+      heading,
+      speed,
       updatedAt: new Date(),
     };
   }

@@ -17,14 +17,17 @@ import {
   RefreshCw,
   Search,
   Database,
+  MapPin,
+  Map,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import DatabaseTablesExplorer from '@/components/admin/DatabaseTablesExplorer';
+import { AdminGodViewMap } from '@/components/admin/AdminGodViewMap';
 
 export default function AdminPage() {
   const { user, isAuthenticated, isLoading, loadProfile } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'METRICS' | 'DATABASE' | 'ORDERS' | 'USERS' | 'STORES' | 'AUDIT'>('METRICS');
+  const [activeTab, setActiveTab] = useState<'METRICS' | 'GOD_VIEW' | 'DATABASE' | 'ORDERS' | 'USERS' | 'STORES' | 'AUDIT'>('METRICS');
 
   React.useEffect(() => {
     loadProfile();
@@ -193,6 +196,17 @@ export default function AdminPage() {
             Overview
           </button>
           <button
+            onClick={() => setActiveTab('GOD_VIEW')}
+            className={`px-3 py-2 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'GOD_VIEW'
+                ? 'bg-[#D9700F] text-white shadow-sm'
+                : 'text-[#6B3A0A] hover:text-[#D9700F]'
+            }`}
+          >
+            <Map className="w-3.5 h-3.5" />
+            <span>God-View Fleet Map</span>
+          </button>
+          <button
             onClick={() => setActiveTab('DATABASE')}
             className={`px-3 py-2 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === 'DATABASE'
@@ -315,6 +329,15 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* GOD VIEW FLEET & STORE COVERAGE MAP TAB */}
+      {activeTab === 'GOD_VIEW' && (
+        <AdminGodViewMap
+          stores={storesList}
+          deliveryPartners={deliveryPartners}
+          orders={orders}
+        />
       )}
 
       {/* DATABASE TABLES & DATASETS EXPLORER */}

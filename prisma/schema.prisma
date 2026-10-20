@@ -74,29 +74,37 @@ model User {
   notifications       Notification[]
   orderStatusChanges  OrderStatusHistory[]
   refreshTokens       RefreshToken[]
+  locationHistories   DriverLocationHistory[]
 
   @@index([email])
   @@index([role])
 }
 
 model Address {
-  id          String   @id @default(uuid())
-  userId      String
-  label       String   @default("Home") // Home, Work, Other
-  street      String
-  city        String
-  state       String
-  postalCode  String
-  latitude    Float?
-  longitude   Float?
-  isDefault   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                   String   @id @default(uuid())
+  userId               String
+  label                String   @default("Home") // Home, Work, Other
+  houseNumber          String?  // Flat / House No
+  buildingName         String?  // Building / Society / Tower
+  street               String   // Road / Street
+  colony               String?  // Sector / Colony / Area
+  landmark             String?  // Nearby Landmark
+  city                 String
+  state                String
+  postalCode           String
+  latitude             Float?
+  longitude            Float?
+  addressType          String?  @default("HOME") // HOME, WORK, OTHER
+  deliveryInstructions String?
+  isDefault            Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orders      Order[]
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders               Order[]
 
   @@index([userId])
+  @@index([latitude, longitude])
 }
 
 model Store {
@@ -344,11 +352,31 @@ model DriverLocation {
   driverId    String   @unique
   latitude    Float
   longitude   Float
+  heading     Float?   @default(0)
+  speed       Float?   @default(0)
   updatedAt   DateTime @updatedAt
 
   driver      DeliveryPartner @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
   @@index([driverId])
+}
+
+model DriverLocationHistory {
+  id            String    @id @default(uuid())
+  driverId      String
+  orderId       String?
+  latitude      Float
+  longitude     Float
+  heading       Float?    @default(0)
+  speed         Float?    @default(0)
+  batteryStatus String?
+  createdAt     DateTime  @default(now())
+
+  driver        User      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([orderId])
+  @@index([createdAt])
 }
 
 model DeliveryPartner {

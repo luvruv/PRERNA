@@ -57,8 +57,10 @@ export class DeliveryController {
     @Body('latitude') latitude: number,
     @Body('longitude') longitude: number,
     @Body('orderId') orderId?: string,
+    @Body('heading') heading?: number,
+    @Body('speed') speed?: number,
   ) {
-    return this.deliveryService.updateLocation(user.id, latitude, longitude, orderId);
+    return this.deliveryService.updateLocation(user.id, latitude, longitude, orderId, heading, speed);
   }
 
   @Patch('orders/:id/status')

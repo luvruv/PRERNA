@@ -7,10 +7,30 @@ export class CreateAddressDto {
   @IsNotEmpty()
   label: string;
 
-  @ApiProperty({ example: 'Flat 402, Sunshine Heights, Sector 14' })
+  @ApiPropertyOptional({ example: 'Flat 402, Tower B' })
+  @IsOptional()
+  @IsString()
+  houseNumber?: string;
+
+  @ApiPropertyOptional({ example: 'Sunshine Heights' })
+  @IsOptional()
+  @IsString()
+  buildingName?: string;
+
+  @ApiProperty({ example: 'MG Road' })
   @IsString()
   @IsNotEmpty()
   street: string;
+
+  @ApiPropertyOptional({ example: 'DLF Phase 2' })
+  @IsOptional()
+  @IsString()
+  colony?: string;
+
+  @ApiPropertyOptional({ example: 'Near Metro Station' })
+  @IsOptional()
+  @IsString()
+  landmark?: string;
 
   @ApiProperty({ example: 'Gurugram' })
   @IsString()
@@ -22,10 +42,20 @@ export class CreateAddressDto {
   @IsNotEmpty()
   state: string;
 
-  @ApiProperty({ example: '122001' })
+  @ApiProperty({ example: '122002' })
   @IsString()
   @IsNotEmpty()
   postalCode: string;
+
+  @ApiPropertyOptional({ default: 'HOME' })
+  @IsOptional()
+  @IsString()
+  addressType?: string;
+
+  @ApiPropertyOptional({ example: 'Leave at security gate' })
+  @IsOptional()
+  @IsString()
+  deliveryInstructions?: string;
 
   @ApiPropertyOptional({ default: false })
   @IsOptional()

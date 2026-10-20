@@ -192,6 +192,17 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
           },
         });
       }
+
+      await this.prisma.driverLocationHistory.create({
+        data: {
+          driverId: user.id,
+          orderId: data.orderId,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          heading: (data as any).heading || 0,
+          speed: data.speed || 0,
+        },
+      });
     } catch (e) {
       this.logger.error(`Failed to persist rider location: ${(e as any).message}`);
     }
@@ -200,6 +211,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.broadcastRiderLocation(data.orderId, {
       latitude: data.latitude,
       longitude: data.longitude,
+      heading: (data as any).heading || 0,
       speed: data.speed,
       updatedAt: new Date().toISOString(),
     });
@@ -213,6 +225,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     payload: {
       latitude: number;
       longitude: number;
+      heading?: number;
       speed?: number;
       status?: string;
       updatedAt: string;
@@ -224,6 +237,6 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       orderId,
       ...payload,
     });
-    this.logger.log(`Broadcasted rider location for ${room}: ${payload.latitude}, ${payload.longitude}`);
+    this.logger.log(`Broadcasted rider location for ${room}: ${payload.latitude}, ${payload.longitude}, heading: ${payload.heading}`);
   }
 }

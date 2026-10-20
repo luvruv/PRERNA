@@ -269,9 +269,7 @@ export function LocationPickerModal() {
               </div>
             </form>
           </div>
-        </div>
-
-          
+          </>
         )}
 
         {/* Doorstep Address Details */}
@@ -379,6 +377,7 @@ export function LocationPickerModal() {
             </div>
           </form>
         )}
+        </div>
 
         {/* Modal Footer */}
         <div className="p-3 bg-[#FAF3EB] border-t border-[#F0DEC8] text-center text-[11px] text-[#8C6D53]">
