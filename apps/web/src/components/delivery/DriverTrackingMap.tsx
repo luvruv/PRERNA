@@ -1,16 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+'use client';
 
-// Fix default icon paths for Leaflet in Next.js
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: '/leaflet/images/marker-icon-2x.png',
-  iconUrl: '/leaflet/images/marker-icon.png',
-  shadowUrl: '/leaflet/images/marker-shadow.png',
-});
+import React, { useEffect, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
 
 type Props = {
   driverId: string;
@@ -18,22 +9,27 @@ type Props = {
 };
 
 export const DriverTrackingMap: React.FC<Props> = ({ driverId, orderId }) => {
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
-  const [customerPos, setCustomerPos] = useState<{ lat: number; lng: number } | null>(
-    null,
-  );
+  const [customerPos, setCustomerPos] = useState<{ lat: number; lng: number } | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const driverMarkerRef = useRef<any>(null);
+  const customerMarkerRef = useRef<any>(null);
+  const leafletModuleRef = useRef<any>(null);
 
   // Connect socket and listen for driver location
   useEffect(() => {
     const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-  const s = io(socketUrl); // API server URL
+    const s = io(socketUrl);
     s.emit('driver:join', { driverId });
-    s.on('driver:location', (data) => {
-      setDriverPos({ lat: data.latitude, lng: data.longitude });
+    s.on('driver:location', (data: { latitude: number; longitude: number }) => {
+      if (typeof data?.latitude === 'number' && typeof data?.longitude === 'number') {
+        setDriverPos({ lat: data.latitude, lng: data.longitude });
+      }
     });
-    setSocket(s);
-    return () => s.disconnect();
+    return () => {
+      s.disconnect();
+    };
   }, [driverId]);
 
   // Fetch order address (customer location) once
@@ -54,30 +50,119 @@ export const DriverTrackingMap: React.FC<Props> = ({ driverId, orderId }) => {
     fetchOrder();
   }, [orderId]);
 
-  // Choose centre: driver if known, else customer, else a generic centre
-  const centre = driverPos ?? customerPos ?? { lat: 0, lng: 0 };
+  // Initialize Leaflet map
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initMap() {
+      if (typeof window === 'undefined' || !mapContainerRef.current) return;
+
+      const L = (await import('leaflet')).default;
+      leafletModuleRef.current = L;
+
+      // Import css safely on client
+      await import('leaflet/dist/leaflet.css' as any).catch(() => {});
+
+      if (!isMounted) return;
+
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+
+      const defaultCenter = driverPos || customerPos || { lat: 28.4595, lng: 77.0266 };
+      const map = L.map(mapContainerRef.current, {
+        center: [defaultCenter.lat, defaultCenter.lng],
+        zoom: 13,
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+
+      mapInstanceRef.current = map;
+
+      // Create Driver Marker if pos known
+      if (driverPos) {
+        const dIcon = L.divIcon({
+          className: 'custom-driver-icon',
+          html: `<div style="background-color: #D9700F; color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);">🚚</div>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+        });
+        driverMarkerRef.current = L.marker([driverPos.lat, driverPos.lng], { icon: dIcon })
+          .addTo(map)
+          .bindPopup('<b>🚚 Delivery Partner</b>');
+      }
+
+      // Create Customer Marker if pos known
+      if (customerPos) {
+        const cIcon = L.divIcon({
+          className: 'custom-customer-icon',
+          html: `<div style="background-color: #059669; color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);">🏠</div>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+        });
+        customerMarkerRef.current = L.marker([customerPos.lat, customerPos.lng], { icon: cIcon })
+          .addTo(map)
+          .bindPopup('<b>🏠 Customer Location</b>');
+      }
+    }
+
+    initMap();
+
+    return () => {
+      isMounted = false;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update Driver Marker position dynamically
+  useEffect(() => {
+    if (!driverPos || !mapInstanceRef.current || !leafletModuleRef.current) return;
+    const L = leafletModuleRef.current;
+    if (driverMarkerRef.current) {
+      driverMarkerRef.current.setLatLng([driverPos.lat, driverPos.lng]);
+    } else {
+      const dIcon = L.divIcon({
+        className: 'custom-driver-icon',
+        html: `<div style="background-color: #D9700F; color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);">🚚</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      });
+      driverMarkerRef.current = L.marker([driverPos.lat, driverPos.lng], { icon: dIcon })
+        .addTo(mapInstanceRef.current)
+        .bindPopup('<b>🚚 Delivery Partner</b>');
+    }
+  }, [driverPos]);
+
+  // Update Customer Marker position dynamically
+  useEffect(() => {
+    if (!customerPos || !mapInstanceRef.current || !leafletModuleRef.current) return;
+    const L = leafletModuleRef.current;
+    if (customerMarkerRef.current) {
+      customerMarkerRef.current.setLatLng([customerPos.lat, customerPos.lng]);
+    } else {
+      const cIcon = L.divIcon({
+        className: 'custom-customer-icon',
+        html: `<div style="background-color: #059669; color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);">🏠</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      });
+      customerMarkerRef.current = L.marker([customerPos.lat, customerPos.lng], { icon: cIcon })
+        .addTo(mapInstanceRef.current)
+        .bindPopup('<b>🏠 Customer Location</b>');
+    }
+  }, [customerPos]);
 
   return (
-    <MapContainer
-      center={[centre.lat, centre.lng]}
-      zoom={13}
+    <div
+      ref={mapContainerRef}
       style={{ height: '300px', width: '100%' }}
-      className="rounded-md shadow-lg"
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {driverPos && (
-        <Marker position={[driverPos.lat, driverPos.lng]}>
-          <Popup>🚚 Delivery partner</Popup>
-        </Marker>
-      )}
-      {customerPos && (
-        <Marker position={[customerPos.lat, customerPos.lng]}>
-          <Popup>🏠 Customer location</Popup>
-        </Marker>
-      )}
-    </MapContainer>
+      className="rounded-xl shadow-md border border-[#F0DEC8] relative overflow-hidden"
+    />
   );
 };

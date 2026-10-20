@@ -115,24 +115,6 @@ export class ShopkeeperService {
     });
   }
 
-  async updateStoreLocation(
-    userId: string,
-    data: { latitude: number; longitude: number; deliveryRadiusKm?: number; address?: string },
-  ) {
-    const store = await this.getShopkeeperStore(userId);
-
-    const updateData: any = {};
-    if (typeof data.latitude === 'number') updateData.latitude = data.latitude;
-    if (typeof data.longitude === 'number') updateData.longitude = data.longitude;
-    if (typeof data.deliveryRadiusKm === 'number') updateData.deliveryRadiusKm = data.deliveryRadiusKm;
-    if (data.address) updateData.address = data.address;
-
-    return this.prisma.store.update({
-      where: { id: store.id },
-      data: updateData,
-    });
-  }
-
   async getDashboard(userId: string) {
     const store = await this.getShopkeeperStore(userId);
     const storeProducts = datasetStore.getProducts().filter((p) => p.storeId === store.id || p.storeName === store.name);
