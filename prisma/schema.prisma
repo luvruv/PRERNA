@@ -113,10 +113,10 @@ model Store {
   bannerUrl   String?
   logoUrl     String?
   rating      Float        @default(4.8)
-  latitude    Float?       @default(28.4595)
-  longitude   Float?       @default(77.0266)
-  deliveryRadiusKm Float   @default(10.0)
-  isActive    Boolean      @default(true)
+  latitude         Float?       @default(28.4595)
+  longitude        Float?       @default(77.0266)
+  deliveryRadiusKm Float?       @default(10.0)
+  isActive         Boolean      @default(true)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
