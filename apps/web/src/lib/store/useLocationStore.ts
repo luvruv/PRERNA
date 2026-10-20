@@ -7,6 +7,15 @@ export interface CustomerLocation {
   label: string;
   address?: string;
   isGps: boolean;
+  houseNumber?: string;
+  buildingName?: string;
+  road?: string;
+  colony?: string;
+  landmark?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  deliveryInstructions?: string;
 }
 
 export interface UnifiedLocationStoreState {
@@ -48,6 +57,10 @@ export const useLocationStore = create<UnifiedLocationStoreState>()(
         label: DEFAULT_LABEL,
         address: DEFAULT_ADDRESS,
         isGps: false,
+        city: 'Gurugram',
+        state: 'Haryana',
+        postalCode: '122002',
+        colony: 'DLF Phase 4',
       },
       latitude: DEFAULT_LAT,
       longitude: DEFAULT_LNG,
@@ -113,6 +126,11 @@ export const useLocationStore = create<UnifiedLocationStoreState>()(
               const lat = Number(pos.coords.latitude.toFixed(5));
               const lng = Number(pos.coords.longitude.toFixed(5));
               let friendlyAddress = `GPS: ${lat}, ${lng}`;
+              let roadName = '';
+              let colonyName = '';
+              let cityName = 'Gurugram';
+              let stateName = 'Haryana';
+              let pinCode = '122002';
 
               try {
                 const controller = new AbortController();
@@ -129,10 +147,16 @@ export const useLocationStore = create<UnifiedLocationStoreState>()(
                   const data = await res.json();
                   if (data?.address) {
                     const addr = data.address;
+                    roadName = addr.road || addr.pedestrian || addr.street || '';
+                    colonyName = addr.suburb || addr.neighbourhood || addr.residential || addr.subdistrict || '';
+                    cityName = addr.city || addr.town || addr.county || 'Gurugram';
+                    stateName = addr.state || 'Haryana';
+                    pinCode = addr.postcode || '122002';
+
                     const parts = [
-                      addr.suburb || addr.neighbourhood || addr.road,
-                      addr.city || addr.town || addr.county || 'Gurugram',
-                      addr.state || 'Haryana',
+                      colonyName || roadName,
+                      cityName,
+                      stateName,
                     ].filter(Boolean);
                     friendlyAddress = parts.length > 0 ? parts.join(', ') : data.display_name.split(',').slice(0, 3).join(',');
                   }
@@ -147,6 +171,11 @@ export const useLocationStore = create<UnifiedLocationStoreState>()(
                 label: friendlyAddress.length > 30 ? friendlyAddress.slice(0, 28) + '...' : friendlyAddress,
                 address: friendlyAddress,
                 isGps: true,
+                road: roadName,
+                colony: colonyName,
+                city: cityName,
+                state: stateName,
+                postalCode: pinCode,
               };
 
               set({

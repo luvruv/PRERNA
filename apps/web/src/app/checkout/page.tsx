@@ -38,6 +38,7 @@ export default function CheckoutPage() {
     longitude,
     address: gpsAddress,
     isGpsLocated,
+    location,
     detectCurrentLocation,
     loadStoredLocation,
   } = useLocationStore();
@@ -47,6 +48,12 @@ export default function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState<string>('gps-current');
   const [isDetectingGps, setIsDetectingGps] = useState(false);
   const [gpsNotification, setGpsNotification] = useState<string | null>(null);
+
+  // Granular doorstep details for GPS Mode
+  const [gpsHouseNo, setGpsHouseNo] = useState('');
+  const [gpsBuilding, setGpsBuilding] = useState('');
+  const [gpsLandmark, setGpsLandmark] = useState('');
+  const [gpsInstructions, setGpsInstructions] = useState('');
 
   // Payment & checkout state
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'TEST_PAYMENT'>('COD');
@@ -59,11 +66,14 @@ export default function CheckoutPage() {
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [newLabel, setNewLabel] = useState<'Home' | 'Work' | 'Other'>('Home');
   const [newHouseNo, setNewHouseNo] = useState('');
-  const [newStreet, setNewStreet] = useState('');
+  const [newBuilding, setNewBuilding] = useState('');
+  const [newRoad, setNewRoad] = useState('');
+  const [newColony, setNewColony] = useState('');
   const [newLandmark, setNewLandmark] = useState('');
   const [newCity, setNewCity] = useState('Gurugram');
   const [newState, setNewState] = useState('Haryana');
   const [newPostalCode, setNewPostalCode] = useState('122002');
+  const [newInstructions, setNewInstructions] = useState('');
   const [isSavingAddress, setIsSavingAddress] = useState(false);
 
   // Fetch saved user addresses from backend
@@ -138,12 +148,23 @@ export default function CheckoutPage() {
 
   // Autofill modal using current GPS location
   const handleAutofillFromGps = () => {
-    if (gpsAddress) {
-      setNewStreet(gpsAddress);
+    if (location) {
+      if (location.road) setNewRoad(location.road);
+      else if (gpsAddress) setNewRoad(gpsAddress.split(',')[0] || '');
+      if (location.colony) setNewColony(location.colony);
+      if (location.city) setNewCity(location.city);
+      if (location.state) setNewState(location.state);
+      if (location.postalCode) setNewPostalCode(location.postalCode);
+      if (location.houseNumber) setNewHouseNo(location.houseNumber);
+      if (location.buildingName) setNewBuilding(location.buildingName);
+      if (location.landmark) setNewLandmark(location.landmark);
+    } else {
+      setNewRoad(gpsAddress || 'DLF Cyber City');
+      setNewColony('Sector 25');
+      setNewCity('Gurugram');
+      setNewState('Haryana');
+      setNewPostalCode('122002');
     }
-    setNewCity('Gurugram');
-    setNewState('Haryana');
-    setNewPostalCode('122002');
   };
 
   // Save new alternate address
@@ -151,16 +172,28 @@ export default function CheckoutPage() {
     e.preventDefault();
     setIsSavingAddress(true);
     try {
-      const combinedStreet = [newHouseNo.trim(), newStreet.trim(), newLandmark.trim()]
+      const fullStreetDisplay = [
+        newHouseNo.trim(),
+        newBuilding.trim(),
+        newRoad.trim(),
+        newColony.trim(),
+        newLandmark.trim() ? `Near ${newLandmark.trim()}` : '',
+      ]
         .filter(Boolean)
         .join(', ');
 
       const created = await api.post('/users/addresses', {
         label: newLabel,
-        street: combinedStreet || newStreet,
-        city: newCity,
-        state: newState,
-        postalCode: newPostalCode,
+        houseNumber: newHouseNo.trim() || undefined,
+        buildingName: newBuilding.trim() || undefined,
+        road: newRoad.trim() || undefined,
+        colony: newColony.trim() || undefined,
+        landmark: newLandmark.trim() || undefined,
+        street: fullStreetDisplay || newRoad || 'Customer Address',
+        city: newCity.trim() || 'Gurugram',
+        state: newState.trim() || 'Haryana',
+        postalCode: newPostalCode.trim() || '122002',
+        deliveryInstructions: newInstructions.trim() || undefined,
         latitude,
         longitude,
         isDefault: true,
@@ -171,8 +204,11 @@ export default function CheckoutPage() {
       setSelectedAddressId(created.id);
       setShowAddressModal(false);
       setNewHouseNo('');
-      setNewStreet('');
+      setNewBuilding('');
+      setNewRoad('');
+      setNewColony('');
       setNewLandmark('');
+      setNewInstructions('');
     } catch (err: any) {
       alert(err.message || 'Failed to save address');
     } finally {
@@ -197,20 +233,37 @@ export default function CheckoutPage() {
       const addressData = isGps
         ? {
             label: 'Current GPS Location',
-            street: gpsAddress || 'DLF Cyber City, Sector 25',
-            city: 'Gurugram',
-            state: 'Haryana',
-            postalCode: '122002',
+            houseNumber: gpsHouseNo.trim() || undefined,
+            buildingName: gpsBuilding.trim() || undefined,
+            landmark: gpsLandmark.trim() || undefined,
+            street: [
+              gpsHouseNo.trim(),
+              gpsBuilding.trim(),
+              gpsLandmark.trim() ? `Near ${gpsLandmark.trim()}` : '',
+              gpsAddress || 'DLF Cyber City, Sector 25',
+            ]
+              .filter(Boolean)
+              .join(', '),
+            city: location?.city || 'Gurugram',
+            state: location?.state || 'Haryana',
+            postalCode: location?.postalCode || '122002',
+            deliveryInstructions: (gpsInstructions || specialInstructions || '').trim() || undefined,
             latitude,
             longitude,
           }
         : chosenAlternate
         ? {
             label: chosenAlternate.label || 'Alternate Address',
+            houseNumber: chosenAlternate.houseNumber || undefined,
+            buildingName: chosenAlternate.buildingName || undefined,
+            road: chosenAlternate.road || undefined,
+            colony: chosenAlternate.colony || undefined,
+            landmark: chosenAlternate.landmark || undefined,
             street: chosenAlternate.street,
             city: chosenAlternate.city || 'Gurugram',
             state: chosenAlternate.state || 'Haryana',
             postalCode: chosenAlternate.postalCode || '122001',
+            deliveryInstructions: (chosenAlternate.deliveryInstructions || specialInstructions || '').trim() || undefined,
             latitude: chosenAlternate.latitude || 28.4682,
             longitude: chosenAlternate.longitude || 77.0851,
           }
@@ -227,7 +280,7 @@ export default function CheckoutPage() {
       const order = await api.post('/orders/checkout', {
         addressId: isGps ? 'gps-current' : selectedAddressId,
         paymentMethod,
-        specialInstructions: specialInstructions || undefined,
+        specialInstructions: (gpsInstructions || specialInstructions || '').trim() || undefined,
         addressData,
       });
 
@@ -431,6 +484,68 @@ export default function CheckoutPage() {
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       Locked & Selected
                     </span>
+                  </div>
+                </div>
+
+                {/* Specific Doorstep Location inputs for Rider Navigation */}
+                <div className="bg-white/95 p-3.5 rounded-2xl border border-[#F0DEC8] space-y-2.5 text-xs shadow-xs">
+                  <div className="flex items-center justify-between border-b border-[#F0DEC8]/60 pb-1.5">
+                    <span className="text-[11px] font-black text-[#6B3A0A] flex items-center gap-1.5">
+                      <Home className="w-3.5 h-3.5 text-[#D9700F]" />
+                      <span>Doorstep & Flat Details (for Delivery Partner)</span>
+                    </span>
+                    <span className="text-[10px] text-[#A66C3E] font-medium">Helps rider find your door</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-[10px] font-bold text-[#8C6D53] block mb-0.5">
+                        House / Flat / Floor No.
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Flat 402, 4th Floor"
+                        value={gpsHouseNo}
+                        onChange={(e) => setGpsHouseNo(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-[#8C6D53] block mb-0.5">
+                        Building / Tower / Society Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Tower B, DLF Cyber City"
+                        value={gpsBuilding}
+                        onChange={(e) => setGpsBuilding(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-[#8C6D53] block mb-0.5">
+                        Nearby Landmark
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Opposite Metro Pillar 42"
+                        value={gpsLandmark}
+                        onChange={(e) => setGpsLandmark(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-[#8C6D53] block mb-0.5">
+                        Doorstep Instructions / Gate Notes
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Leave at door / Call on arrival"
+                        value={gpsInstructions}
+                        onChange={(e) => setGpsInstructions(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -742,55 +857,121 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-[#6B3A0A] mb-1">
+                    House / Flat / Floor No. *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Flat 402, 4th Floor"
+                    value={newHouseNo}
+                    onChange={(e) => setNewHouseNo(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#6B3A0A] mb-1">
+                    Building / Tower / Society Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Tower B, DLF The Crest"
+                    value={newBuilding}
+                    onChange={(e) => setNewBuilding(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-[#6B3A0A] mb-1">
+                    Road / Street / Lane *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Golf Course Extension Road"
+                    value={newRoad}
+                    onChange={(e) => setNewRoad(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#6B3A0A] mb-1">
+                    Colony / Sector / Area *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. DLF Phase 5, Sector 54"
+                    value={newColony}
+                    onChange={(e) => setNewColony(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block font-bold text-[#6B3A0A] mb-1">
-                  Flat / House / Floor / Building Number
+                  Nearby Landmark
                 </label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. Flat 301, Tower B, Sunshine Residency"
-                  value={newHouseNo}
-                  onChange={(e) => setNewHouseNo(e.target.value)}
+                  placeholder="e.g. Opposite One Horizon Center, Near HDFC Bank"
+                  value={newLandmark}
+                  onChange={(e) => setNewLandmark(e.target.value)}
                   className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs focus:outline-none focus:border-[#D9700F]"
                 />
               </div>
 
-              <div>
-                <label className="block font-bold text-[#6B3A0A] mb-1">
-                  Street, Colony / Area & Landmark
-                </label>
-                <textarea
-                  required
-                  rows={2}
-                  placeholder="e.g. Near Galleria Market, DLF Phase 4, Sector 28"
-                  value={newStreet}
-                  onChange={(e) => setNewStreet(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs focus:outline-none focus:border-[#D9700F]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-bold text-[#6B3A0A] mb-1">City</label>
+                  <label className="block font-bold text-[#6B3A0A] mb-1">City *</label>
                   <input
                     type="text"
                     required
                     value={newCity}
                     onChange={(e) => setNewCity(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs"
+                    className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs focus:outline-none focus:border-[#D9700F]"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-[#6B3A0A] mb-1">Pincode</label>
+                  <label className="block font-bold text-[#6B3A0A] mb-1">State *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newState}
+                    onChange={(e) => setNewState(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#6B3A0A] mb-1">PIN Code *</label>
                   <input
                     type="text"
                     required
                     value={newPostalCode}
                     onChange={(e) => setNewPostalCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs"
+                    placeholder="122002"
+                    className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs focus:outline-none focus:border-[#D9700F]"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#6B3A0A] mb-1">
+                  Doorstep Delivery Notes / Gate Instructions
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Ring bell twice, leave with security guard"
+                  value={newInstructions}
+                  onChange={(e) => setNewInstructions(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#FAF3EB]/50 border border-[#F0DEC8] rounded-xl text-xs focus:outline-none focus:border-[#D9700F]"
+                />
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2.5">

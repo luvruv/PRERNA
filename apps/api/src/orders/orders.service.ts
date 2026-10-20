@@ -60,10 +60,16 @@ export class OrdersService {
       if (dto.addressData) {
         deliveryAddress = {
           label: dto.addressData.label || 'Delivery Address',
+          houseNumber: dto.addressData.houseNumber,
+          buildingName: dto.addressData.buildingName,
+          road: dto.addressData.road,
+          colony: dto.addressData.colony,
+          landmark: dto.addressData.landmark,
           street: dto.addressData.street || 'Selected Delivery Location',
           city: dto.addressData.city || 'Gurugram',
           state: dto.addressData.state || 'Haryana',
           postalCode: dto.addressData.postalCode || '122001',
+          deliveryInstructions: dto.addressData.deliveryInstructions,
           latitude: dto.addressData.latitude || 28.4595,
           longitude: dto.addressData.longitude || 77.0266,
         };

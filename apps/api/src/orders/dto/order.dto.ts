@@ -22,9 +22,15 @@ export class CheckoutDto {
   addressData?: {
     label?: string;
     street: string;
+    houseNumber?: string;
+    buildingName?: string;
+    road?: string;
+    colony?: string;
+    landmark?: string;
     city?: string;
     state?: string;
     postalCode?: string;
+    deliveryInstructions?: string;
     latitude?: number;
     longitude?: number;
   };

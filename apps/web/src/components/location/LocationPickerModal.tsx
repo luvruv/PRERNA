@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MapPin, Navigation, X, Check, Search, AlertCircle, Compass } from 'lucide-react';
+import { MapPin, Navigation, X, Check, Search, AlertCircle, Compass, Home, Building, FileText } from 'lucide-react';
 import { useLocationStore } from '@/lib/store/useLocationStore';
 
 const PRESET_LOCALITIES = [
@@ -17,10 +17,22 @@ export function LocationPickerModal() {
   const { isPickerOpen, closePicker, location, setLocation, requestCurrentGps, isLocating, error } =
     useLocationStore();
 
+  const [activeTab, setActiveTab] = useState<'PRESETS' | 'DOORSTEP'>('PRESETS');
   const [searchQuery, setSearchQuery] = useState('');
   const [manualLat, setManualLat] = useState(location.latitude.toString());
   const [manualLng, setManualLng] = useState(location.longitude.toString());
   const [manualLabel, setManualLabel] = useState(location.label);
+
+  // Doorstep detailed address state
+  const [houseNo, setHouseNo] = useState(location.houseNumber || '');
+  const [building, setBuilding] = useState(location.buildingName || '');
+  const [road, setRoad] = useState(location.road || '');
+  const [colony, setColony] = useState(location.colony || '');
+  const [landmark, setLandmark] = useState(location.landmark || '');
+  const [city, setCity] = useState(location.city || 'Gurugram');
+  const [state, setState] = useState(location.state || 'Haryana');
+  const [postalCode, setPostalCode] = useState(location.postalCode || '122002');
+  const [instructions, setInstructions] = useState(location.deliveryInstructions || '');
 
   if (!isPickerOpen) return null;
 
@@ -31,6 +43,44 @@ export function LocationPickerModal() {
       label: preset.label,
       address: `${preset.label}, ${preset.area}`,
       isGps: false,
+      colony: preset.area,
+      city: preset.area === 'New Delhi' ? 'New Delhi' : 'Gurugram',
+      state: preset.area === 'New Delhi' ? 'Delhi' : 'Haryana',
+    });
+  };
+
+  const handleSaveDoorstepAddress = (e: React.FormEvent) => {
+    e.preventDefault();
+    const fullFormatted = [
+      houseNo.trim(),
+      building.trim(),
+      road.trim(),
+      colony.trim(),
+      landmark.trim() ? `Near ${landmark.trim()}` : '',
+      `${city.trim()}, ${state.trim()} - ${postalCode.trim()}`,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const labelDisplay = houseNo.trim()
+      ? `${houseNo.trim()}, ${colony.trim() || road.trim() || city.trim()}`
+      : location.label;
+
+    setLocation({
+      ...location,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      label: labelDisplay.length > 32 ? labelDisplay.slice(0, 30) + '...' : labelDisplay,
+      address: fullFormatted,
+      houseNumber: houseNo.trim(),
+      buildingName: building.trim(),
+      road: road.trim(),
+      colony: colony.trim(),
+      landmark: landmark.trim(),
+      city: city.trim(),
+      state: state.trim(),
+      postalCode: postalCode.trim(),
+      deliveryInstructions: instructions.trim() || undefined,
     });
   };
 
@@ -80,7 +130,25 @@ export function LocationPickerModal() {
 
         {/* Modal Body */}
         <div className="p-5 space-y-5 overflow-y-auto flex-1">
-          {/* Current GPS Button */}
+          {/* Tab Selector */}
+          <div className="flex space-x-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setActiveTab('PRESETS')}
+              className={`px-4 py-2 rounded-t-xl ${activeTab === 'PRESETS' ? 'bg-white shadow-inner' : 'bg-[#FAF3EB]'} transition`}
+            >
+              Quick Hubs &amp; GPS
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('DOORSTEP')}
+              className={`px-4 py-2 rounded-t-xl ${activeTab === 'DOORSTEP' ? 'bg-white shadow-inner' : 'bg-[#FAF3EB]'} transition`}
+            >
+              Doorstep Address
+            </button>
+          </div>
+{activeTab === 'PRESETS' && (
+          <>
           <button
             type="button"
             onClick={() => requestCurrentGps()}
@@ -202,6 +270,115 @@ export function LocationPickerModal() {
             </form>
           </div>
         </div>
+
+          
+        )}
+
+        {/* Doorstep Address Details */}
+        {activeTab === 'DOORSTEP' && (
+          <form onSubmit={handleSaveDoorstepAddress} className="space-y-4">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">House/Flat No.</label>
+                <input
+                  type="text"
+                  value={houseNo}
+                  onChange={e => setHouseNo(e.target.value)}
+                  placeholder="101"
+                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Building/Society</label>
+                <input
+                  type="text"
+                  value={building}
+                  onChange={e => setBuilding(e.target.value)}
+                  placeholder="DLF Phase 5"
+                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Road/Street</label>
+                <input
+                  type="text"
+                  value={road}
+                  onChange={e => setRoad(e.target.value)}
+                  placeholder="Golf Course Road"
+                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Colony/Sector</label>
+                <input
+                  type="text"
+                  value={colony}
+                  onChange={e => setColony(e.target.value)}
+                  placeholder="Sector 29"
+                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Landmark (optional)</label>
+                <input
+                  type="text"
+                  value={landmark}
+                  onChange={e => setLandmark(e.target.value)}
+                  placeholder="Near Community Hall"
+                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">City</label>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={e => setCity(e.target.value)}
+                  placeholder="Gurugram"
+                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">State</label>
+                <input
+                  type="text"
+                  value={state}
+                  onChange={e => setState(e.target.value)}
+                  placeholder="Haryana"
+                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">PIN Code</label>
+                <input
+                  type="text"
+                  value={postalCode}
+                  onChange={e => setPostalCode(e.target.value)}
+                  placeholder="122002"
+                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Delivery Instructions (optional)</label>
+              <textarea
+                value={instructions}
+                onChange={e => setInstructions(e.target.value)}
+                placeholder="Leave at reception"
+                rows={2}
+                className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+              />
+            </div>
+            <div className="text-center">
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-[#D9700F] text-white rounded-xl font-bold text-xs hover:bg-primary-hover shadow-md shadow-orange-500/20 transition-all"
+              >
+                Save & Set Delivery Address
+              </button>
+            </div>
+          </form>
+        )}
 
         {/* Modal Footer */}
         <div className="p-3 bg-[#FAF3EB] border-t border-[#F0DEC8] text-center text-[11px] text-[#8C6D53]">
