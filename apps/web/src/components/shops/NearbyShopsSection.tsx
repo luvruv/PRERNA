@@ -23,7 +23,7 @@ export default function NearbyShopsSection() {
   const [deliverableOnly, setDeliverableOnly] = useState(true);
 
   const {
-    data: stores = [],
+    data: rawData,
     isLoading,
     isFetching,
     refetch,
@@ -35,6 +35,12 @@ export default function NearbyShopsSection() {
       ),
     enabled: typeof latitude === 'number' && typeof longitude === 'number',
   });
+
+  const stores: any[] = Array.isArray(rawData)
+    ? rawData
+    : Array.isArray((rawData as any)?.stores)
+      ? (rawData as any).stores
+      : [];
 
   return (
     <section className="space-y-4">
