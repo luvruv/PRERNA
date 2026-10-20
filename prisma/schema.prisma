@@ -339,6 +339,18 @@ model Payment {
   @@index([status])
 }
 
+model DriverLocation {
+  id          String   @id @default(uuid())
+  driverId    String   @unique
+  latitude    Float
+  longitude   Float
+  updatedAt   DateTime @updatedAt
+
+  driver      DeliveryPartner @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+}
+
 model DeliveryPartner {
   id            String               @id @default(uuid())
   userId        String               @unique
@@ -350,6 +362,9 @@ model DeliveryPartner {
   lastLocationAt DateTime?
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
+
+  // One-to-one relation to driver location for real‑time GPS tracking
+  driverLocation DriverLocation? @relation
 
   user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments   DeliveryAssignment[]

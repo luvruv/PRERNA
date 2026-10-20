@@ -167,6 +167,25 @@ export function OrderGpsTrackingMap({
       }
     });
 
+    socket.on('driver:location', (data: any) => {
+      if (typeof data?.latitude === 'number' && typeof data?.longitude === 'number') {
+        setCurrentRiderLat(data.latitude);
+        setCurrentRiderLng(data.longitude);
+        setLastSocketPing(new Date().toLocaleTimeString());
+
+        if (riderMarkerRef.current) {
+          riderMarkerRef.current.setLatLng([data.latitude, data.longitude]);
+        }
+        if (routePolylineRef.current) {
+          routePolylineRef.current.setLatLngs([
+            [sLat, sLng],
+            [data.latitude, data.longitude],
+            [cLat, cLng],
+          ]);
+        }
+      }
+    });
+
     socket.on('disconnect', () => {
       setIsSocketConnected(false);
     });

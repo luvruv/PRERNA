@@ -16,8 +16,11 @@ import {
 import { api } from '@/lib/api';
 import ProductCard from '@/components/ui/ProductCard';
 import NearbyShopsSection from '@/components/shops/NearbyShopsSection';
+import { useLocationStore } from '@/lib/store/useLocationStore';
 
 export default function HomePage() {
+  const { location, openPicker } = useLocationStore();
+
   // 1. Fetch categories
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ['categories'],

@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Boxes,
   MapPin,
+  Navigation,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/useAuthStore';
@@ -56,6 +57,69 @@ export default function ShopkeeperDashboardPage() {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [storeLat, setStoreLat] = useState<string>('');
+  const [storeLng, setStoreLng] = useState<string>('');
+  const [storeRadius, setStoreRadius] = useState<string>('10');
+  const [storeAddress, setStoreAddress] = useState<string>('');
+  const [locationSuccess, setLocationSuccess] = useState<string | null>(null);
+
+  // Sync initial location when dashboard loads
+  React.useEffect(() => {
+    if (dashboard?.store) {
+      setStoreLat(dashboard.store.latitude?.toString() || '28.4595');
+      setStoreLng(dashboard.store.longitude?.toString() || '77.0266');
+      setStoreRadius(dashboard.store.deliveryRadiusKm?.toString() || '10');
+      setStoreAddress(dashboard.store.address || '');
+    }
+  }, [dashboard]);
+
+  const handleLocationSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const lat = parseFloat(storeLat);
+    const lng = parseFloat(storeLng);
+    const radius = parseFloat(storeRadius);
+
+    if (isNaN(lat) || isNaN(lng) || isNaN(radius)) {
+      alert('Please enter valid numerical latitude, longitude, and radius values');
+      return;
+    }
+
+    setSavingLocation(true);
+    setLocationSuccess(null);
+    try {
+      await api.patch('/shopkeeper/store/location', {
+        latitude: lat,
+        longitude: lng,
+        deliveryRadiusKm: radius,
+        address: storeAddress,
+      });
+      setLocationSuccess('Store GPS coordinates and delivery coverage updated successfully!');
+      refetch();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update store location');
+    } finally {
+      setSavingLocation(false);
+    }
+  };
+
+  const handleUseDeviceLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setStoreLat(pos.coords.latitude.toFixed(5));
+        setStoreLng(pos.coords.longitude.toFixed(5));
+      },
+      (err) => {
+        alert('Could not fetch device GPS: ' + err.message);
+      },
+      { enableHighAccuracy: true },
+    );
   };
 
   if (isAuthLoading || (isAuthenticated && isDashboardLoading)) {
@@ -205,6 +269,103 @@ export default function ShopkeeperDashboardPage() {
             Restock items →
           </Link>
         </div>
+      </div>
+
+      {/* Shop Location & Delivery Coverage Editor */}
+      <div className="bg-white rounded-3xl border border-[#F0DEC8] shadow-card p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#F7E3CF]/50 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-orange-100 text-[#D9700F] flex items-center justify-center shadow-sm">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-[#6B3A0A]">Store GPS Location & Delivery Coverage</h2>
+              <p className="text-xs text-[#8C6D53]">
+                Configure shop coordinates and delivery radius so nearby customers can discover your store
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleUseDeviceLocation}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FAF3EB] hover:bg-orange-50 border border-[#F0DEC8] hover:border-[#D9700F] text-[#6B3A0A] rounded-xl text-xs font-bold transition-all cursor-pointer"
+          >
+            <Navigation className="w-3.5 h-3.5 text-[#D9700F]" /> Use Device GPS
+          </button>
+        </div>
+
+        {locationSuccess && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800">
+            {locationSuccess}
+          </div>
+        )}
+
+        <form onSubmit={handleLocationSave} className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+          <div>
+            <label className="text-[11px] font-bold text-[#8C6D53] block mb-1">Store Latitude (°N)</label>
+            <input
+              type="text"
+              value={storeLat}
+              onChange={(e) => setStoreLat(e.target.value)}
+              placeholder="28.4595"
+              className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-[#8C6D53] block mb-1">Store Longitude (°E)</label>
+            <input
+              type="text"
+              value={storeLng}
+              onChange={(e) => setStoreLng(e.target.value)}
+              placeholder="77.0266"
+              className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-[#8C6D53] block mb-1">Delivery Radius (km)</label>
+            <input
+              type="number"
+              step="0.5"
+              min="1"
+              max="50"
+              value={storeRadius}
+              onChange={(e) => setStoreRadius(e.target.value)}
+              placeholder="10"
+              className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-[#8C6D53] block mb-1">Physical Address</label>
+            <input
+              type="text"
+              value={storeAddress}
+              onChange={(e) => setStoreAddress(e.target.value)}
+              placeholder="Galleria Market, DLF Phase 4"
+              className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+            />
+          </div>
+
+          <div className="md:col-span-4 flex items-center justify-between pt-1">
+            <span className="text-[11px] text-[#A66C3E]">
+              Current status:{' '}
+              <b className="text-[#6B3A0A]">
+                {storeLat && storeLng ? `Active at (${storeLat}, ${storeLng}) • ${storeRadius} km radius` : 'No GPS set'}
+              </b>
+            </span>
+
+            <button
+              type="submit"
+              disabled={savingLocation}
+              className="px-6 py-2 bg-[#D9700F] text-white rounded-xl text-xs font-bold hover:bg-primary-hover shadow-md shadow-orange-500/20 transition-all cursor-pointer"
+            >
+              {savingLocation ? 'Saving...' : 'Save Location & Coverage'}
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Orders Management Table & Tabbed Control */}

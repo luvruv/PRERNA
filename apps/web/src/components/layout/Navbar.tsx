@@ -18,17 +18,16 @@ import {
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useCartStore } from '@/lib/store/useCartStore';
 import { useLocationStore } from '@/lib/store/useLocationStore';
-import AddressDeliveryModal from '@/components/location/AddressDeliveryModal';
+import { LocationPickerModal } from '@/components/location/LocationPickerModal';
 
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, isAuthenticated, logout, loadProfile } = useAuthStore();
   const { cart, fetchCart } = useCartStore();
-  const { address, isGpsLocated, loadStoredLocation } = useLocationStore();
+  const { location, openPicker, loadStoredLocation } = useLocationStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -53,15 +52,18 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-[#FAF3EB]/95 backdrop-blur-md border-b border-[#F0DEC8]">
-      {/* Top micro-bar for quick demo role navigation */}
-      <div className="bg-[#6B3A0A] text-[#FDF1E6] text-xs py-1 px-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-[#D9700F]">⚡ 10-Min Delivery</span>
-            <span className="hidden sm:inline text-cream-200">| Serving DLF Phase 1-5, Gurugram</span>
-          </div>
-          <div className="flex items-center gap-3">
+      <LocationPickerModal />
+      <header className="sticky top-0 z-40 bg-[#FAF3EB]/95 backdrop-blur-md border-b border-[#F0DEC8]">
+        {/* Top micro-bar for quick demo role navigation */}
+        <div className="bg-[#6B3A0A] text-[#FDF1E6] text-xs py-1 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-[#D9700F]">⚡ 10-Min Delivery</span>
+              <span className="hidden sm:inline text-cream-200">
+                | Serving {location.label || location.address || 'DLF Phase 1-5, Gurugram'}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
             <span className="text-cream-300 hidden md:inline">Demo Dashboards:</span>
             <Link
               href="/shopkeeper"
@@ -103,30 +105,29 @@ export default function Navbar() {
             </div>
           </Link>
 
-          {/* Delivery Location badge - Interactive & Clickable */}
+
+          {/* Delivery Location badge */}
           <button
             type="button"
-            onClick={() => setIsAddressModalOpen(true)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-white/90 hover:bg-orange-50/80 rounded-full border border-[#F0DEC8] hover:border-[#D9700F] text-xs text-[#6B3A0A] transition-all shadow-sm group active:scale-95 text-left"
-            title="Click to change delivery address or track GPS"
+            onClick={openPicker}
+            className="flex items-center gap-2 px-3 py-1.5 bg-white/90 hover:bg-white rounded-full border border-[#F0DEC8] hover:border-[#D9700F] text-xs text-[#6B3A0A] transition-all shadow-sm hover:shadow group text-left cursor-pointer"
+            title="Click to change delivery location or use device GPS"
           >
-            <div className="w-6 h-6 rounded-full bg-[#FFF2E5] text-[#D9700F] flex items-center justify-center shrink-0 group-hover:bg-[#D9700F] group-hover:text-white transition-colors">
+            <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-[#D9700F] group-hover:scale-110 transition-transform">
               <MapPin className="w-3.5 h-3.5" />
             </div>
             <div className="flex flex-col text-left">
-              <div className="flex items-center gap-1">
-                <span className="font-extrabold text-[11px] leading-tight text-[#6B3A0A] group-hover:text-[#D9700F]">
-                  Delivery in 10 Mins
-                </span>
-                {isGpsLocated && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" title="GPS Verified" />
+              <span className="font-black text-[11px] leading-tight text-[#6B3A0A] flex items-center gap-1">
+                <span>Delivery in 10 Mins</span>
+                {location.isGps && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" title="Using Live GPS" />
                 )}
-              </div>
-              <span className="text-[10px] text-[#8C6D53] truncate max-w-[110px] sm:max-w-[140px] lg:max-w-[170px]">
-                {address}
+              </span>
+              <span className="text-[10px] text-[#8C6D53] truncate max-w-[130px]">
+                {location.label || location.address || 'Select location'}
               </span>
             </div>
-            <ChevronDown className="w-3 h-3 text-[#A66C3E] group-hover:text-[#D9700F] group-hover:translate-y-0.5 transition-all" />
+            <ChevronDown className="w-3.5 h-3.5 text-[#A66C3E] group-hover:text-[#D9700F] transition-colors" />
           </button>
         </div>
 
@@ -294,14 +295,7 @@ export default function Navbar() {
           />
         </form>
       </div>
-
       </header>
-
-      {/* Delivery Address & GPS Modal */}
-      <AddressDeliveryModal
-        isOpen={isAddressModalOpen}
-        onClose={() => setIsAddressModalOpen(false)}
-      />
     </>
   );
 }
