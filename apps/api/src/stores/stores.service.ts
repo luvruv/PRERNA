@@ -206,5 +206,58 @@ export class StoresService {
       stores: nearbyStores,
     };
   }
+
+  // Calculate Haversine distance in kilometers
+  private calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Number((R * c).toFixed(2));
+  }
+
+  async findNearby(lat: number, lng: number, maxRadiusKm = 25) {
+    const allStores = await this.prisma.store.findMany({
+      where: {
+        isActive: true,
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      include: {
+        _count: {
+          select: { products: true },
+        },
+      },
+    });
+
+    const nearbyStores = allStores
+      .map((store) => {
+        const distanceKm = this.calculateDistanceKm(lat, lng, store.latitude!, store.longitude!);
+        const deliveryRadius = store.deliveryRadiusKm ?? 10.0;
+        const isDeliverable = distanceKm <= deliveryRadius;
+
+        return {
+          ...store,
+          distanceKm,
+          isDeliverable,
+          estimatedDeliveryMins: Math.max(10, Math.round(distanceKm * 3 + 8)),
+        };
+      })
+      .filter((store) => store.distanceKm <= maxRadiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    return {
+      customerLocation: { latitude: lat, longitude: lng },
+      searchRadiusKm: maxRadiusKm,
+      totalNearby: nearbyStores.length,
+      stores: nearbyStores,
+    };
+  }
 }
 
