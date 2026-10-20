@@ -121,7 +121,35 @@ export class OrdersService {
       throw new BadRequestException('Cannot checkout with an empty cart');
     }
 
-    const storeId = cart.items[0].product.storeId;
+    const store = cart.items[0].product.store;
+    const storeId = store.id;
+
+    // 2.1 Hyperlocal delivery-radius validation if coordinates are configured
+    if (
+      address.latitude &&
+      address.longitude &&
+      store.latitude &&
+      store.longitude
+    ) {
+      const R = 6371; // Earth's radius in km
+      const dLat = ((address.latitude - store.latitude) * Math.PI) / 180;
+      const dLon = ((address.longitude - store.longitude) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((store.latitude * Math.PI) / 180) *
+          Math.cos((address.latitude * Math.PI) / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distanceKm = Number((R * c).toFixed(2));
+      const deliveryRadius = (store as any).deliveryRadiusKm ?? 10.0;
+
+      if (distanceKm > deliveryRadius) {
+        throw new BadRequestException(
+          `Your address is ${distanceKm} km away, which exceeds "${store.name}"'s delivery radius of ${deliveryRadius} km. Please select a closer delivery address.`,
+        );
+      }
+    }
 
     // 3. Server-side totals calculation (Never trust frontend)
     let subtotal = 0;

@@ -50,6 +50,15 @@ export class ShopkeeperController {
     return this.shopkeeperService.getDashboard(user.id);
   }
 
+  @Patch('store/location')
+  @ApiOperation({ summary: 'Update shopkeeper store GPS coordinates and delivery radius' })
+  async updateStoreLocation(
+    @CurrentUser() user: any,
+    @Body() dto: { latitude: number; longitude: number; deliveryRadiusKm?: number; address?: string },
+  ) {
+    return this.shopkeeperService.updateStoreLocation(user.id, dto);
+  }
+
   @Get('orders')
   @ApiOperation({ summary: 'Get orders belonging to shopkeeper store' })
   async getOrders(
