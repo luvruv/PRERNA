@@ -28,15 +28,19 @@ export default function Navbar() {
   const { location, openPicker, loadStoredLocation } = useLocationStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     loadProfile();
     loadStoredLocation();
   }, [loadProfile, loadStoredLocation]);
 
   useEffect(() => {
-    fetchCart();
-  }, [isAuthenticated, fetchCart]);
+    if (mounted) {
+      fetchCart();
+    }
+  }, [mounted, isAuthenticated, fetchCart]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +64,7 @@ export default function Navbar() {
             <div className="flex items-center gap-2">
               <span className="font-semibold text-[#D9700F]">⚡ 10-Min Delivery</span>
               <span className="hidden sm:inline text-cream-200">
-                | Serving {location.label || location.address || 'DLF Phase 1-5, Gurugram'}
+                | Serving {mounted ? (location.label || location.address || 'DLF Phase 1-5, Gurugram') : 'DLF Phase 1-5, Gurugram'}
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -119,12 +123,12 @@ export default function Navbar() {
             <div className="flex flex-col text-left">
               <span className="font-black text-[11px] leading-tight text-[#6B3A0A] flex items-center gap-1">
                 <span>Delivery in 10 Mins</span>
-                {location.isGps && (
+                {mounted && location.isGps && (
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" title="Using Live GPS" />
                 )}
               </span>
               <span className="text-[10px] text-[#8C6D53] truncate max-w-[130px]">
-                {location.label || location.address || 'Select location'}
+                {(mounted && (location.label || location.address)) || 'Select location'}
               </span>
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-[#A66C3E] group-hover:text-[#D9700F] transition-colors" />
@@ -165,7 +169,7 @@ export default function Navbar() {
           </Link>
 
           {/* User Account / Login */}
-          {isAuthenticated && user ? (
+          {mounted && isAuthenticated && user ? (
             <div className="relative">
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
@@ -269,14 +273,14 @@ export default function Navbar() {
           >
             <div className="relative">
               <ShoppingBag className="w-4 h-4" />
-              {cart.totalItems > 0 && (
+              {mounted && cart.totalItems > 0 && (
                 <span className="absolute -top-2 -right-2 bg-white text-[#D9700F] text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-sm">
                   {cart.totalItems}
                 </span>
               )}
             </div>
             <span className="hidden sm:inline">
-              {cart.totalItems > 0 ? `₹${cart.total}` : 'My Cart'}
+              {mounted && cart.totalItems > 0 ? `₹${cart.total}` : 'My Cart'}
             </span>
           </Link>
         </div>

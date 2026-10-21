@@ -41,6 +41,15 @@ interface CartState {
 
 const LOCAL_STORAGE_KEY = 'prerna_local_cart';
 
+const EMPTY_CART: CartData = {
+  items: [],
+  totalItems: 0,
+  subtotal: 0,
+  deliveryFee: 0,
+  tax: 0,
+  total: 0,
+};
+
 function getInitialLocalCart(): CartData {
   if (typeof window !== 'undefined') {
     try {
@@ -53,14 +62,7 @@ function getInitialLocalCart(): CartData {
       }
     } catch {}
   }
-  return {
-    items: [],
-    totalItems: 0,
-    subtotal: 0,
-    deliveryFee: 0,
-    tax: 0,
-    total: 0,
-  };
+  return EMPTY_CART;
 }
 
 function calculateCartTotals(items: CartItem[]): CartData {
@@ -101,7 +103,7 @@ function saveLocalCart(cart: CartData) {
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
-  cart: getInitialLocalCart(),
+  cart: EMPTY_CART,
   isLoading: false,
 
   fetchCart: async () => {
