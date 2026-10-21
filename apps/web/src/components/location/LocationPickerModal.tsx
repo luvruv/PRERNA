@@ -1,8 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MapPin, Navigation, X, Check, Search, AlertCircle, Compass, Home, Building, FileText } from 'lucide-react';
+import {
+  MapPin,
+  Navigation,
+  X,
+  Check,
+  AlertCircle,
+  Compass,
+  Map as MapIcon,
+} from 'lucide-react';
 import { useLocationStore } from '@/lib/store/useLocationStore';
+import { PinpointMapPicker } from '@/components/location/PinpointMapPicker';
 
 const PRESET_LOCALITIES = [
   { label: 'Galleria Market, DLF Phase 4', lat: 28.4595, lng: 77.0266, area: 'Gurugram' },
@@ -14,10 +23,17 @@ const PRESET_LOCALITIES = [
 ];
 
 export function LocationPickerModal() {
-  const { isPickerOpen, closePicker, location, setLocation, requestCurrentGps, isLocating, error } =
-    useLocationStore();
+  const {
+    isPickerOpen,
+    closePicker,
+    location,
+    setLocation,
+    requestCurrentGps,
+    isLocating,
+    error,
+  } = useLocationStore();
 
-  const [activeTab, setActiveTab] = useState<'PRESETS' | 'DOORSTEP'>('PRESETS');
+  const [activeTab, setActiveTab] = useState<'PRESETS' | 'MAP' | 'DOORSTEP'>('PRESETS');
   const [searchQuery, setSearchQuery] = useState('');
   const [manualLat, setManualLat] = useState(location.latitude.toString());
   const [manualLng, setManualLng] = useState(location.longitude.toString());
@@ -101,9 +117,10 @@ export function LocationPickerModal() {
     });
   };
 
-  const filteredPresets = PRESET_LOCALITIES.filter((p) =>
-    p.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.area.toLowerCase().includes(searchQuery.toLowerCase()),
+  const filteredPresets = PRESET_LOCALITIES.filter(
+    (p) =>
+      p.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.area.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
@@ -117,7 +134,9 @@ export function LocationPickerModal() {
             </div>
             <div>
               <h2 className="text-base font-black text-[#6B3A0A]">Select Delivery Location</h2>
-              <p className="text-[11px] text-[#8C6D53]">For instant 10-min grocery delivery from closest stores</p>
+              <p className="text-[11px] text-[#8C6D53]">
+                For instant 10-min grocery delivery from closest stores
+              </p>
             </div>
           </div>
           <button
@@ -135,254 +154,346 @@ export function LocationPickerModal() {
             <button
               type="button"
               onClick={() => setActiveTab('PRESETS')}
-              className={`px-4 py-2 rounded-t-xl ${activeTab === 'PRESETS' ? 'bg-white shadow-inner' : 'bg-[#FAF3EB]'} transition`}
+              className={`px-3.5 py-2 rounded-t-xl text-xs font-bold ${
+                activeTab === 'PRESETS'
+                  ? 'bg-white text-[#D9700F] shadow-sm'
+                  : 'bg-[#FAF3EB] text-[#6B3A0A]'
+              } transition`}
             >
               Quick Hubs &amp; GPS
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab('MAP')}
+              className={`px-3.5 py-2 rounded-t-xl text-xs font-bold flex items-center gap-1 ${
+                activeTab === 'MAP'
+                  ? 'bg-white text-[#D9700F] shadow-sm'
+                  : 'bg-[#FAF3EB] text-[#6B3A0A]'
+              } transition`}
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              <span>Pin on Map</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab('DOORSTEP')}
-              className={`px-4 py-2 rounded-t-xl ${activeTab === 'DOORSTEP' ? 'bg-white shadow-inner' : 'bg-[#FAF3EB]'} transition`}
+              className={`px-3.5 py-2 rounded-t-xl text-xs font-bold ${
+                activeTab === 'DOORSTEP'
+                  ? 'bg-white text-[#D9700F] shadow-sm'
+                  : 'bg-[#FAF3EB] text-[#6B3A0A]'
+              } transition`}
             >
               Doorstep Address
             </button>
           </div>
-{activeTab === 'PRESETS' && (
-          <>
-          <button
-            type="button"
-            onClick={() => requestCurrentGps()}
-            disabled={isLocating}
-            className="w-full flex items-center justify-between p-3.5 bg-orange-50 border-2 border-[#D9700F] rounded-2xl hover:bg-orange-100 text-left transition-all group shadow-sm"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#D9700F] text-white flex items-center justify-center">
-                <Navigation className={`w-5 h-5 ${isLocating ? 'animate-spin' : ''}`} />
-              </div>
-              <div>
-                <div className="text-xs font-black text-[#6B3A0A] flex items-center gap-2">
-                  <span>Use Current GPS Location</span>
-                  {location.isGps && (
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
-                      Active
-                    </span>
-                  )}
-                </div>
-                <div className="text-[11px] text-[#A66C3E]">
-                  {isLocating ? 'Fetching satellite coordinates...' : 'Uses your browser device geolocation'}
-                </div>
-              </div>
-            </div>
-            <span className="text-xs font-bold text-[#D9700F] group-hover:translate-x-1 transition-transform">
-              Detect →
-            </span>
-          </button>
 
-          {error && (
-            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
-              <AlertCircle className="w-4 h-4 text-[#D9700F] shrink-0 mt-0.5" />
-              <span>{error}</span>
+          {/* ── Pin on Live Map Tab ── */}
+          {activeTab === 'MAP' && (
+            <div className="space-y-4">
+              <div className="text-xs text-[#8C6D53]">
+                Drag the pin or click on the map to set your exact doorstep drop location.
+              </div>
+              <PinpointMapPicker
+                initialLat={location.latitude}
+                initialLng={location.longitude}
+                onLocationSelect={(lat, lng, addressName) => {
+                  setManualLat(lat.toString());
+                  setManualLng(lng.toString());
+                  if (addressName) {
+                    setRoad(addressName);
+                    setManualLabel(addressName);
+                  }
+                }}
+              />
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocation({
+                      ...location,
+                      latitude: parseFloat(manualLat) || location.latitude,
+                      longitude: parseFloat(manualLng) || location.longitude,
+                      label: manualLabel || location.label,
+                      address: manualLabel || location.address,
+                    });
+                    closePicker();
+                  }}
+                  className="w-full py-2.5 bg-[#D9700F] text-white rounded-xl font-bold text-xs hover:bg-primary-hover shadow-md shadow-orange-500/20 transition-all"
+                >
+                  Confirm Pinned Location
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('DOORSTEP')}
+                  className="px-4 py-2.5 bg-white border border-[#D9700F] text-[#D9700F] rounded-xl font-bold text-xs hover:bg-orange-50 transition-all whitespace-nowrap"
+                >
+                  + Add Flat/House No
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Quick Preset Delivery Hubs */}
-          <div className="space-y-2">
-            <div className="text-xs font-bold text-[#6B3A0A] uppercase tracking-wider">
-              Popular Delivery Hubs
-            </div>
-            <div className="space-y-1.5">
-              {filteredPresets.map((preset) => {
-                const isSelected =
-                  Math.abs(location.latitude - preset.lat) < 0.001 &&
-                  Math.abs(location.longitude - preset.lng) < 0.001;
-
-                return (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => handleSelectPreset(preset)}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all ${
-                      isSelected
-                        ? 'border-[#D9700F] bg-[#FFF2E5]'
-                        : 'border-[#F0DEC8] hover:border-[#D9700F]/60 hover:bg-cream-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Compass className={`w-4 h-4 ${isSelected ? 'text-[#D9700F]' : 'text-[#A66C3E]'}`} />
-                      <div>
-                        <div className="text-xs font-bold text-[#6B3A0A]">{preset.label}</div>
-                        <div className="text-[10px] text-[#8C6D53]">
-                          {preset.area} • ({preset.lat.toFixed(4)}, {preset.lng.toFixed(4)})
-                        </div>
-                      </div>
+          {/* ── Presets & GPS Tab ── */}
+          {activeTab === 'PRESETS' && (
+            <>
+              <button
+                type="button"
+                onClick={() => requestCurrentGps()}
+                disabled={isLocating}
+                className="w-full flex items-center justify-between p-3.5 bg-orange-50 border-2 border-[#D9700F] rounded-2xl hover:bg-orange-100 text-left transition-all group shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#D9700F] text-white flex items-center justify-center">
+                    <Navigation className={`w-5 h-5 ${isLocating ? 'animate-spin' : ''}`} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-[#6B3A0A] flex items-center gap-2">
+                      <span>Use Current GPS Location</span>
+                      {location.isGps && (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                          Active
+                        </span>
+                      )}
                     </div>
-                    {isSelected && <Check className="w-4 h-4 text-[#D9700F]" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                    <div className="text-[11px] text-[#A66C3E]">
+                      {isLocating
+                        ? 'Fetching satellite coordinates...'
+                        : 'Uses your browser device geolocation'}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-[#D9700F] group-hover:translate-x-1 transition-transform">
+                  Detect →
+                </span>
+              </button>
 
-          {/* Manual GPS Coordinate Entry */}
-          <div className="pt-2 border-t border-[#F0DEC8] space-y-3">
-            <div className="text-xs font-bold text-[#6B3A0A] uppercase tracking-wider">
-              Custom GPS Coordinates
-            </div>
-            <form onSubmit={handleApplyCoordinates} className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Latitude (°N)</label>
-                <input
-                  type="text"
-                  value={manualLat}
-                  onChange={(e) => setManualLat(e.target.value)}
-                  placeholder="28.4595"
-                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
-                />
+              {error && (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+                  <AlertCircle className="w-4 h-4 text-[#D9700F] shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Quick Preset Delivery Hubs */}
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-[#6B3A0A] uppercase tracking-wider">
+                  Popular Delivery Hubs
+                </div>
+                <div className="space-y-1.5">
+                  {filteredPresets.map((preset) => {
+                    const isSelected =
+                      Math.abs(location.latitude - preset.lat) < 0.001 &&
+                      Math.abs(location.longitude - preset.lng) < 0.001;
+
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => handleSelectPreset(preset)}
+                        className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all ${
+                          isSelected
+                            ? 'border-[#D9700F] bg-[#FFF2E5]'
+                            : 'border-[#F0DEC8] hover:border-[#D9700F]/60 hover:bg-cream-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Compass
+                            className={`w-4 h-4 ${isSelected ? 'text-[#D9700F]' : 'text-[#A66C3E]'}`}
+                          />
+                          <div>
+                            <div className="text-xs font-bold text-[#6B3A0A]">{preset.label}</div>
+                            <div className="text-[10px] text-[#8C6D53]">
+                              {preset.area} • ({preset.lat.toFixed(4)}, {preset.lng.toFixed(4)})
+                            </div>
+                          </div>
+                        </div>
+                        {isSelected && <Check className="w-4 h-4 text-[#D9700F]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Manual GPS Coordinate Entry */}
+              <div className="pt-2 border-t border-[#F0DEC8] space-y-3">
+                <div className="text-xs font-bold text-[#6B3A0A] uppercase tracking-wider">
+                  Custom GPS Coordinates
+                </div>
+                <form onSubmit={handleApplyCoordinates} className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">
+                      Latitude (°N)
+                    </label>
+                    <input
+                      type="text"
+                      value={manualLat}
+                      onChange={(e) => setManualLat(e.target.value)}
+                      placeholder="28.4595"
+                      className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">
+                      Longitude (°E)
+                    </label>
+                    <input
+                      type="text"
+                      value={manualLng}
+                      onChange={(e) => setManualLng(e.target.value)}
+                      placeholder="77.0266"
+                      className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">
+                      Location Label
+                    </label>
+                    <input
+                      type="text"
+                      value={manualLabel}
+                      onChange={(e) => setManualLabel(e.target.value)}
+                      placeholder="e.g. My Apartment, DLF Phase 5"
+                      className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                    />
+                  </div>
+                  <div className="col-span-2 mt-1">
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-[#D9700F] text-white rounded-xl font-bold text-xs hover:bg-primary-hover shadow-md shadow-orange-500/20 transition-all"
+                    >
+                      Set Delivery Pin
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </>
+          )}
+
+          {/* ── Doorstep Address Details ── */}
+          {activeTab === 'DOORSTEP' && (
+            <form onSubmit={handleSaveDoorstepAddress} className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">
+                    House/Flat No.
+                  </label>
+                  <input
+                    type="text"
+                    value={houseNo}
+                    onChange={(e) => setHouseNo(e.target.value)}
+                    placeholder="101"
+                    className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">
+                    Building/Society
+                  </label>
+                  <input
+                    type="text"
+                    value={building}
+                    onChange={(e) => setBuilding(e.target.value)}
+                    placeholder="DLF Phase 5"
+                    className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">
+                    Road/Street
+                  </label>
+                  <input
+                    type="text"
+                    value={road}
+                    onChange={(e) => setRoad(e.target.value)}
+                    placeholder="Golf Course Road"
+                    className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">
+                    Colony/Sector
+                  </label>
+                  <input
+                    type="text"
+                    value={colony}
+                    onChange={(e) => setColony(e.target.value)}
+                    placeholder="Sector 29"
+                    className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">
+                    Landmark (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={landmark}
+                    onChange={(e) => setLandmark(e.target.value)}
+                    placeholder="Near Community Hall"
+                    className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">City</label>
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="Gurugram"
+                    className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">State</label>
+                  <input
+                    type="text"
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    placeholder="Haryana"
+                    className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">
+                    PIN Code
+                  </label>
+                  <input
+                    type="text"
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
+                    placeholder="122002"
+                    className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
+                  />
+                </div>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Longitude (°E)</label>
-                <input
-                  type="text"
-                  value={manualLng}
-                  onChange={(e) => setManualLng(e.target.value)}
-                  placeholder="77.0266"
+                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">
+                  Delivery Instructions (optional)
+                </label>
+                <textarea
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  placeholder="Leave at reception"
+                  rows={2}
                   className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
                 />
               </div>
-              <div className="col-span-2">
-                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Location Label</label>
-                <input
-                  type="text"
-                  value={manualLabel}
-                  onChange={(e) => setManualLabel(e.target.value)}
-                  placeholder="e.g. My Apartment, DLF Phase 5"
-                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
-                />
-              </div>
-              <div className="col-span-2 mt-1">
+              <div className="text-center">
                 <button
                   type="submit"
                   className="w-full py-2.5 bg-[#D9700F] text-white rounded-xl font-bold text-xs hover:bg-primary-hover shadow-md shadow-orange-500/20 transition-all"
                 >
-                  Set Delivery Pin
+                  Save &amp; Set Delivery Address
                 </button>
               </div>
             </form>
-          </div>
-          </>
-        )}
-
-        {/* Doorstep Address Details */}
-        {activeTab === 'DOORSTEP' && (
-          <form onSubmit={handleSaveDoorstepAddress} className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">House/Flat No.</label>
-                <input
-                  type="text"
-                  value={houseNo}
-                  onChange={e => setHouseNo(e.target.value)}
-                  placeholder="101"
-                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Building/Society</label>
-                <input
-                  type="text"
-                  value={building}
-                  onChange={e => setBuilding(e.target.value)}
-                  placeholder="DLF Phase 5"
-                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Road/Street</label>
-                <input
-                  type="text"
-                  value={road}
-                  onChange={e => setRoad(e.target.value)}
-                  placeholder="Golf Course Road"
-                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Colony/Sector</label>
-                <input
-                  type="text"
-                  value={colony}
-                  onChange={e => setColony(e.target.value)}
-                  placeholder="Sector 29"
-                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Landmark (optional)</label>
-                <input
-                  type="text"
-                  value={landmark}
-                  onChange={e => setLandmark(e.target.value)}
-                  placeholder="Near Community Hall"
-                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">City</label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={e => setCity(e.target.value)}
-                  placeholder="Gurugram"
-                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">State</label>
-                <input
-                  type="text"
-                  value={state}
-                  onChange={e => setState(e.target.value)}
-                  placeholder="Haryana"
-                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">PIN Code</label>
-                <input
-                  type="text"
-                  value={postalCode}
-                  onChange={e => setPostalCode(e.target.value)}
-                  placeholder="122002"
-                  className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-[#8C6D53] block mb-1">Delivery Instructions (optional)</label>
-              <textarea
-                value={instructions}
-                onChange={e => setInstructions(e.target.value)}
-                placeholder="Leave at reception"
-                rows={2}
-                className="w-full px-3 py-2 bg-[#FAF3EB] border border-[#F0DEC8] rounded-xl text-xs text-[#2D1B0D] focus:outline-none focus:border-[#D9700F]"
-              />
-            </div>
-            <div className="text-center">
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-[#D9700F] text-white rounded-xl font-bold text-xs hover:bg-primary-hover shadow-md shadow-orange-500/20 transition-all"
-              >
-                Save & Set Delivery Address
-              </button>
-            </div>
-          </form>
-        )}
+          )}
         </div>
 
         {/* Modal Footer */}
         <div className="p-3 bg-[#FAF3EB] border-t border-[#F0DEC8] text-center text-[11px] text-[#8C6D53]">
-          Current Selected: <b className="text-[#6B3A0A]">{location.label}</b> ({location.latitude.toFixed(4)},{' '}
-          {location.longitude.toFixed(4)})
+          Current Selected: <b className="text-[#6B3A0A]">{location.label}</b> (
+          {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})
         </div>
       </div>
     </div>
