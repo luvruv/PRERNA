@@ -21,12 +21,23 @@ import {
   ExternalLink,
   KeyRound,
   Map,
+  TrendingUp,
+  IndianRupee,
+  Award,
+  ToggleLeft,
+  ToggleRight,
+  Zap,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { RiderMiniRouteMap } from '@/components/delivery/RiderMiniRouteMap';
+import { useRiderSocket } from '@/lib/hooks/useRiderSocket';
 
 export default function DeliveryDashboardPage() {
   const { user, isAuthenticated, isLoading, loadProfile } = useAuthStore();
+  const [isOnline, setIsOnline] = useState(true);
   const [activeTab, setActiveTab] = useState<'AVAILABLE' | 'ACTIVE' | 'HISTORY'>('ACTIVE');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isContinuousBroadcasting, setIsContinuousBroadcasting] = useState(true);
@@ -42,6 +53,8 @@ export default function DeliveryDashboardPage() {
     lat: 28.4595,
     lng: 77.0266,
   });
+  const [currentHeading, setCurrentHeading] = useState<number>(0);
+  const [riderSpeed, setRiderSpeed] = useState<number>(0);
   const [gpsStatus, setGpsStatus] = useState<string>('GPS Active (DLF Sector Hub)');
   const [isUpdatingGps, setIsUpdatingGps] = useState(false);
 
@@ -79,6 +92,13 @@ export default function DeliveryDashboardPage() {
     enabled: isAuthenticated && user?.role === 'DELIVERY_PARTNER' && activeTab === 'HISTORY',
   });
 
+  // Active order ID for socket room (derived after queries are declared)
+  const activeOrderId = activeDeliveries[0]?.order?.id ?? null;
+
+  // WebSocket — emit rider location to /tracking gateway
+  const { isConnected: isSocketLive, emitLocation, statusLabel: socketStatus, lastPing } =
+    useRiderSocket({ orderId: activeOrderId });
+
   // Background / Active GPS Broadcaster every 4 seconds when continuous broadcast is on
   useEffect(() => {
     if (!isContinuousBroadcasting || typeof window === 'undefined' || !navigator.geolocation) return;
@@ -92,7 +112,12 @@ export default function DeliveryDashboardPage() {
           const speed = pos.coords.speed || 0;
           const heading = pos.coords.heading || 0;
           setCurrentGps({ lat, lng });
-          setGpsStatus(`Live GPS: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E • ${Math.round(speed * 3.6)} km/h`);
+          if (heading) setCurrentHeading(heading);
+          setRiderSpeed(Math.round(speed * 3.6)); // m/s → km/h
+          setGpsStatus(`Live GPS: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E • ${Math.round(speed * 3.6)} km/h • ${Math.round(heading)}°`);
+
+          // ═ Dual-channel: REST (persist) + WebSocket (real-time broadcast)
+          emitLocation({ latitude: lat, longitude: lng, heading, speed: Math.round(speed * 3.6) });
           try {
             await api.post('/delivery/location', {
               latitude: lat,
@@ -204,13 +229,27 @@ export default function DeliveryDashboardPage() {
     const newLat = curLat + (destLat - curLat) * 0.3;
     const newLng = curLng + (destLng - curLng) * 0.3;
 
-    setCurrentGps({ lat: newLat, lng: newLng });
-    setGpsStatus(`Simulated GPS: ${newLat.toFixed(4)}°N, ${newLng.toFixed(4)}°E (Moving)`);
+    // Calculate heading bearing towards target
+    const dLon = ((destLng - curLng) * Math.PI) / 180;
+    const y = Math.sin(dLon) * Math.cos((destLat * Math.PI) / 180);
+    const x =
+      Math.cos((curLat * Math.PI) / 180) * Math.sin((destLat * Math.PI) / 180) -
+      Math.sin((curLat * Math.PI) / 180) * Math.cos((destLat * Math.PI) / 180) * Math.cos(dLon);
+    const heading = Math.round(((Math.atan2(y, x) * 180) / Math.PI + 360) % 360);
 
+    setCurrentGps({ lat: newLat, lng: newLng });
+    setCurrentHeading(heading);
+    setRiderSpeed(28);
+    setGpsStatus(`Simulated GPS: ${newLat.toFixed(4)}°N, ${newLng.toFixed(4)}°E (heading: ${heading}° • 28 km/h)`);
+
+    // ═ Dual-channel broadcast
+    emitLocation({ latitude: newLat, longitude: newLng, heading, speed: 28 });
     try {
       await api.post('/delivery/location', {
         latitude: newLat,
         longitude: newLng,
+        heading,
+        speed: 28,
         orderId: order?.id,
       });
       await refetchActive();
@@ -234,18 +273,44 @@ export default function DeliveryDashboardPage() {
 
   const partnerProfile = user.deliveryPartner;
 
+  // ── Derived stats ────────────────────────────────────────────────────
+  const todayDeliveries = deliveryHistory.filter((h: any) => {
+    const d = new Date(h.deliveredAt || h.order?.updatedAt);
+    const now = new Date();
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  });
+  const todayEarnings = todayDeliveries.length * 45; // ₹45 flat payout per delivery
+  const totalEarnings = deliveryHistory.length * 45;
+  const avgPerDelivery = deliveryHistory.length > 0 ? (totalEarnings / deliveryHistory.length).toFixed(0) : '0';
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       {/* Rider Header Card */}
       <div className="bg-white rounded-3xl p-6 border border-[#F0DEC8] shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 shadow-sm">
-            <Bike className="w-7 h-7" />
+          <div className="relative">
+            <div className="w-14 h-14 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 shadow-sm">
+              <Bike className="w-7 h-7" />
+            </div>
+            {/* Online indicator dot */}
+            <span
+              className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white shadow transition-colors duration-300 ${
+                isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'
+              }`}
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                Active Rider
+              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                isOnline
+                  ? 'text-purple-700 bg-purple-50 border-purple-200'
+                  : 'text-gray-500 bg-gray-100 border-gray-200'
+              }`}>
+                {isOnline ? 'Online · Active Rider' : 'Offline · Invisible'}
               </span>
               {(isFetchingActive || isFetchingAvailable) && (
                 <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
@@ -262,50 +327,89 @@ export default function DeliveryDashboardPage() {
           </div>
         </div>
 
-        {/* Tab Toggle Navigation */}
-        <div className="flex items-center bg-[#FAF3EB] p-1 rounded-2xl border border-[#F0DEC8] overflow-x-auto">
+        <div className="flex flex-col items-end gap-3">
+          {/* Online/Offline Toggle */}
           <button
-            onClick={() => setActiveTab('AVAILABLE')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-              activeTab === 'AVAILABLE'
-                ? 'bg-[#D9700F] text-white shadow-sm'
-                : 'text-[#6B3A0A] hover:text-[#D9700F]'
+            type="button"
+            onClick={() => setIsOnline(!isOnline)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl border-2 text-xs font-black transition-all duration-300 ${
+              isOnline
+                ? 'bg-emerald-50 border-emerald-400 text-emerald-700 hover:bg-emerald-100'
+                : 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200'
             }`}
           >
-            <span>Available Requests</span>
-            {availableOrders.length > 0 && (
-              <span className="px-1.5 py-0.2 bg-white text-[#D9700F] rounded-full text-[10px] font-black">
-                {availableOrders.length}
-              </span>
+            {isOnline ? (
+              <><ToggleRight className="w-4 h-4" /> Go Offline</>
+            ) : (
+              <><ToggleLeft className="w-4 h-4" /> Go Online</>
             )}
           </button>
 
-          <button
-            onClick={() => setActiveTab('ACTIVE')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-              activeTab === 'ACTIVE'
-                ? 'bg-[#D9700F] text-white shadow-sm'
-                : 'text-[#6B3A0A] hover:text-[#D9700F]'
-            }`}
-          >
-            <span>Active Deliveries</span>
-            {activeDeliveries.length > 0 && (
-              <span className="px-1.5 py-0.2 bg-white text-purple-700 rounded-full text-[10px] font-black">
-                {activeDeliveries.length}
-              </span>
-            )}
-          </button>
+          {/* Tab Toggle Navigation */}
+          <div className="flex items-center bg-[#FAF3EB] p-1 rounded-2xl border border-[#F0DEC8] overflow-x-auto">
+            <button
+              onClick={() => setActiveTab('AVAILABLE')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                activeTab === 'AVAILABLE'
+                  ? 'bg-[#D9700F] text-white shadow-sm'
+                  : 'text-[#6B3A0A] hover:text-[#D9700F]'
+              }`}
+            >
+              <span>Requests</span>
+              {availableOrders.length > 0 && (
+                <span className="px-1.5 py-0.5 bg-white text-[#D9700F] rounded-full text-[10px] font-black">
+                  {availableOrders.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('ACTIVE')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                activeTab === 'ACTIVE'
+                  ? 'bg-[#D9700F] text-white shadow-sm'
+                  : 'text-[#6B3A0A] hover:text-[#D9700F]'
+              }`}
+            >
+              <span>Active</span>
+              {activeDeliveries.length > 0 && (
+                <span className="px-1.5 py-0.5 bg-white text-purple-700 rounded-full text-[10px] font-black">
+                  {activeDeliveries.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('HISTORY')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                activeTab === 'HISTORY'
+                  ? 'bg-[#D9700F] text-white shadow-sm'
+                  : 'text-[#6B3A0A] hover:text-[#D9700F]'
+              }`}
+            >
+              Earnings
+            </button>
+          </div>
+        </div>
+      </div>
 
-          <button
-            onClick={() => setActiveTab('HISTORY')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === 'HISTORY'
-                ? 'bg-[#D9700F] text-white shadow-sm'
-                : 'text-[#6B3A0A] hover:text-[#D9700F]'
-            }`}
-          >
-            History
-          </button>
+
+      {/* ── Earnings Summary Ribbon ──────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white rounded-2xl p-4 border border-[#F0DEC8] shadow-card flex flex-col gap-1">
+          <span className="text-[10px] font-bold text-[#8C6D53] uppercase tracking-wide">Today's Earnings</span>
+          <span className="text-xl font-black text-emerald-600">₹{todayEarnings}</span>
+          <span className="text-[10px] text-[#8C6D53]">{todayDeliveries.length} deliveries today</span>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-[#F0DEC8] shadow-card flex flex-col gap-1">
+          <span className="text-[10px] font-bold text-[#8C6D53] uppercase tracking-wide">Total Payout</span>
+          <span className="text-xl font-black text-[#6B3A0A]">₹{totalEarnings}</span>
+          <span className="text-[10px] text-[#8C6D53]">{deliveryHistory.length} total completed</span>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-[#F0DEC8] shadow-card flex flex-col gap-1">
+          <span className="text-[10px] font-bold text-[#8C6D53] uppercase tracking-wide">Avg / Delivery</span>
+          <span className="text-xl font-black text-purple-700">₹{avgPerDelivery}</span>
+          <span className="text-[10px] text-[#8C6D53]">
+            {activeDeliveries.length > 0 ? `${activeDeliveries.length} in-progress` : 'Idle · Ready'}
+          </span>
         </div>
       </div>
 
@@ -316,11 +420,28 @@ export default function DeliveryDashboardPage() {
             <Radio className="w-5 h-5 animate-pulse text-[#D9700F]" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-black text-[#6B3A0A]">
+            <div className="flex items-center gap-1.5 text-xs font-black text-[#6B3A0A] flex-wrap">
               <span>Rider GPS Telemetry</span>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+              {/* WebSocket live badge */}
+              {activeOrderId ? (
+                isSocketLive ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                    <Wifi className="w-2.5 h-2.5" /> Socket Live
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-[#D9700F] border border-amber-200">
+                    <WifiOff className="w-2.5 h-2.5" /> {socketStatus}
+                  </span>
+                )
+              ) : null}
             </div>
             <p className="text-xs text-[#8C6D53] font-medium">{gpsStatus}</p>
+            {lastPing && (
+              <p className="text-[10px] text-emerald-600 font-semibold">
+                Last broadcast: {new Date(lastPing).toLocaleTimeString()}
+              </p>
+            )}
           </div>
         </div>
 
@@ -600,6 +721,23 @@ export default function DeliveryDashboardPage() {
                     </div>
                   </div>
 
+                  {/* In-App Mini Route Map */}
+                  <RiderMiniRouteMap
+                    riderLat={currentGps.lat}
+                    riderLng={currentGps.lng}
+                    riderHeading={currentHeading}
+                    riderSpeed={riderSpeed}
+                    isSocketLive={isSocketLive}
+                    storeLat={ord?.store?.latitude || 28.4595}
+                    storeLng={ord?.store?.longitude || 77.0266}
+                    customerLat={ord?.address?.latitude || 28.4682}
+                    customerLng={ord?.address?.longitude || 77.0384}
+                    storeName={ord?.store?.name || 'Pickup Store'}
+                    customerName={ord?.customer?.name || 'Customer'}
+                    orderNumber={ord?.orderNumber || ''}
+                    orderStatus={ord?.status}
+                  />
+
                   {/* Rider Sequential Action Pipeline */}
                   <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[#F7E3CF]/50">
                     <div className="text-xs text-[#8C6D53] flex items-center gap-1">
@@ -685,42 +823,78 @@ export default function DeliveryDashboardPage() {
         </div>
       )}
 
-      {/* TAB 3: Completed History */}
+      {/* TAB 3: Earnings & History */}
       {activeTab === 'HISTORY' && (
         <div className="space-y-4">
-          <h2 className="text-base font-black text-[#6B3A0A]">
-            Completed Deliveries ({deliveryHistory.length})
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-black text-[#6B3A0A] flex items-center gap-2">
+              <Award className="w-4 h-4 text-[#D9700F]" />
+              Earnings & Delivery History
+            </h2>
+            <span className="text-xs font-bold text-emerald-600">₹{totalEarnings} total</span>
+          </div>
 
           {deliveryHistory.length === 0 ? (
             <div className="bg-white rounded-3xl p-12 text-center border border-[#F0DEC8]">
-              <p className="text-xs text-[#8C6D53]">No past completed delivery records yet.</p>
+              <Bike className="w-10 h-10 text-[#D9700F] mx-auto mb-3" />
+              <p className="text-sm font-black text-[#6B3A0A]">No deliveries completed yet</p>
+              <p className="text-xs text-[#8C6D53] mt-1">Accept orders to start earning!</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {deliveryHistory.map((item: any) => (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-2xl p-4 border border-[#F0DEC8] shadow-card flex items-center justify-between gap-4 text-xs"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-[#6B3A0A]">#{item.order?.orderNumber}</span>
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full">
-                        DELIVERED
-                      </span>
-                    </div>
-                    <span className="text-[#8C6D53] text-[11px] mt-0.5 block">
-                      Delivered to {item.order?.customer?.name} at {item.order?.address?.city}
-                    </span>
-                  </div>
+            <div className="space-y-2">
+              {deliveryHistory.map((item: any, idx: number) => {
+                const deliveredAt = item.deliveredAt || item.order?.updatedAt;
+                const timeStr = deliveredAt
+                  ? new Date(deliveredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : '—';
+                const dateStr = deliveredAt
+                  ? new Date(deliveredAt).toLocaleDateString([], { month: 'short', day: 'numeric' })
+                  : '—';
+                const runningTotal = (deliveryHistory.length - idx) * 45;
 
-                  <div className="text-right">
-                    <span className="font-black text-sm text-[#6B3A0A]">₹{item.order?.total}</span>
-                    <span className="text-[10px] text-emerald-600 block font-bold">Payout Complete</span>
+                return (
+                  <div
+                    key={item.id}
+                    className="bg-white rounded-2xl p-4 border border-[#F0DEC8] shadow-card flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[11px] text-[#6B3A0A]">#{item.order?.orderNumber}</span>
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                            DELIVERED
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-[#8C6D53] block mt-0.5">
+                          {item.order?.customer?.name} · {item.order?.address?.city}
+                        </span>
+                        <span className="text-[10px] text-[#B09070]">
+                          {dateStr} at {timeStr}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="font-black text-base text-emerald-600 block">+₹45</span>
+                      <span className="text-[10px] text-[#8C6D53]">Payout</span>
+                    </div>
                   </div>
+                );
+              })}
+
+              {/* Summary footer */}
+              <div className="bg-gradient-to-r from-[#FAF3EB] to-orange-50 rounded-2xl p-4 border border-[#F0DEC8] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-[#D9700F]" />
+                  <span className="text-xs font-black text-[#6B3A0A]">
+                    {deliveryHistory.length} deliveries · ₹45 avg payout
+                  </span>
                 </div>
-              ))}
+                <span className="font-black text-sm text-emerald-600">₹{totalEarnings} total</span>
+              </div>
             </div>
           )}
         </div>
