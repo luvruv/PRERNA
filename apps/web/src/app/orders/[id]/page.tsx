@@ -38,6 +38,7 @@ export default function OrderTrackingPage() {
   const router = useRouter();
   const orderId = params.id as string;
   const [cancelling, setCancelling] = useState(false);
+  const [copiedOtp, setCopiedOtp] = useState(false);
 
   const { data: order, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['order', orderId],
@@ -84,7 +85,6 @@ export default function OrderTrackingPage() {
 
   const delivery = order.deliveryAssignment;
   const rider = delivery?.deliveryPartner;
-  const [copiedOtp, setCopiedOtp] = useState(false);
   const otpPin = order.deliveryPin || (order.orderNumber ? order.orderNumber.replace(/\D/g, '').slice(-4) || '4829' : '4829');
 
   return (
