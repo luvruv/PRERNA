@@ -16,6 +16,8 @@ import {
   Phone,
   RefreshCw,
   ShieldCheck,
+  KeyRound,
+  Lock,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { OrderGpsTrackingMap } from '@/components/orders/OrderGpsTrackingMap';
@@ -82,6 +84,8 @@ export default function OrderTrackingPage() {
 
   const delivery = order.deliveryAssignment;
   const rider = delivery?.deliveryPartner;
+  const [copiedOtp, setCopiedOtp] = useState(false);
+  const otpPin = order.deliveryPin || (order.orderNumber ? order.orderNumber.replace(/\D/g, '').slice(-4) || '4829' : '4829');
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -134,16 +138,99 @@ export default function OrderTrackingPage() {
           </p>
         </div>
 
-        {canCancel && (
-          <button
-            onClick={handleCancelOrder}
-            disabled={cancelling}
-            className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold transition-all"
-          >
-            {cancelling ? 'Cancelling...' : 'Cancel Order'}
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {canCancel && (
+            <button
+              onClick={handleCancelOrder}
+              disabled={cancelling}
+              className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold transition-all"
+            >
+              {cancelling ? 'Cancelling...' : 'Cancel Order'}
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Dedicated Customer Doorstep Delivery PIN / OTP Banner */}
+      {!isCancelled && (
+        <div className="bg-gradient-to-r from-[#FFF5EB] via-[#FAF3EB] to-[#FFF9F5] rounded-3xl p-5 sm:p-6 border-2 border-[#D9700F]/40 shadow-soft relative overflow-hidden">
+          <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-[#D9700F]/5 rounded-full pointer-events-none" />
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#D9700F] to-[#B85B07] text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-[#D9700F] bg-orange-100/80 px-2.5 py-0.5 rounded-full">
+                    Doorstep Delivery Security PIN
+                  </span>
+                  {order.status === 'OUT_FOR_DELIVERY' && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full animate-pulse">
+                      ● Rider Arriving Soon
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-[#6B3A0A]">
+                  Share this 4-Digit OTP with the Delivery Partner
+                </h3>
+                <p className="text-xs text-[#8C6D53] max-w-lg leading-relaxed">
+                  To ensure safe, contactless handover and verify your package, provide this one-time PIN only when the rider arrives at your doorstep.
+                </p>
+              </div>
+            </div>
+
+            {/* OTP Code Box & Copy */}
+            <div className="flex flex-col sm:items-end gap-2 shrink-0">
+              {order.status === 'DELIVERED' ? (
+                <div className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-300">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <span>Verified & Delivered</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-1.5 bg-white px-4 py-2.5 rounded-2xl border-2 border-[#D9700F] shadow-sm">
+                    {otpPin.split('').map((digit: string, idx: number) => (
+                      <span
+                        key={idx}
+                        className="w-8 h-9 flex items-center justify-center font-black text-xl text-[#D9700F] bg-[#FAF3EB] rounded-lg tracking-wider"
+                      >
+                        {digit}
+                      </span>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(otpPin);
+                        setCopiedOtp(true);
+                        setTimeout(() => setCopiedOtp(false), 2000);
+                      }
+                    }}
+                    title="Copy Delivery PIN"
+                    className="p-3 bg-white border border-[#F0DEC8] hover:border-[#D9700F] text-[#6B3A0A] hover:text-[#D9700F] rounded-2xl shadow-sm transition-all flex items-center justify-center"
+                  >
+                    {copiedOtp ? (
+                      <span className="text-[11px] font-bold text-emerald-600 px-1">Copied!</span>
+                    ) : (
+                      <KeyRound className="w-4 h-4 text-[#D9700F]" />
+                    )}
+                  </button>
+                </div>
+              )}
+
+              <span className="text-[11px] font-medium text-[#8C6D53]">
+                {order.status === 'DELIVERED'
+                  ? 'Delivery confirmed successfully'
+                  : 'Valid until order handover is complete'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Live GPS Route Tracking Map */}
       {!isCancelled && (

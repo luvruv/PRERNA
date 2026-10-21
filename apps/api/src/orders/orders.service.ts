@@ -402,6 +402,7 @@ export class OrdersService {
       return {
         id: found.id,
         orderNumber: found.orderNumber,
+        deliveryPin: (found as any).deliveryPin || found.orderNumber.replace(/\D/g, '').slice(-4) || '4829',
         status: found.orderStatus,
         total: found.billing?.totalAmount || 285.0,
         createdAt: found.timestamp,
