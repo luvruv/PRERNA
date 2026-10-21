@@ -56,6 +56,7 @@ export function OrderGpsTrackingMap({
 
   const [currentRiderLat, setCurrentRiderLat] = useState<number>(riderLat || (sLat + cLat) / 2);
   const [currentRiderLng, setCurrentRiderLng] = useState<number>(riderLng || (sLng + cLng) / 2);
+  const [currentRiderHeading, setCurrentRiderHeading] = useState<number>(0);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [lastSocketPing, setLastSocketPing] = useState<string | null>(null);
 
@@ -87,6 +88,22 @@ export function OrderGpsTrackingMap({
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
+
+  // Calculate bearing in degrees from point A to point B
+  const calculateBearing = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const y = Math.sin(dLon) * Math.cos((lat2 * Math.PI) / 180);
+    const x =
+      Math.cos((lat1 * Math.PI) / 180) * Math.sin((lat2 * Math.PI) / 180) -
+      Math.sin((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.cos(dLon);
+    const brng = (Math.atan2(y, x) * 180) / Math.PI;
+    return (brng + 360) % 360;
+  };
+
+  const prevCoordsRef = useRef<{ lat: number; lng: number }>({
+    lat: riderLat || (sLat + cLat) / 2,
+    lng: riderLng || (sLng + cLng) / 2,
+  });
 
   const distToCustomer = getDistanceKm(currentRiderLat, currentRiderLng, cLat, cLng);
   const totalTripDist = getDistanceKm(sLat, sLng, cLat, cLng);
@@ -147,42 +164,53 @@ export function OrderGpsTrackingMap({
       );
     });
 
+    const updateRiderPositionAndHeading = (newLat: number, newLng: number, explicitHeading?: number) => {
+      let heading = explicitHeading;
+      if (typeof heading !== 'number' || isNaN(heading)) {
+        const prev = prevCoordsRef.current;
+        if (prev && (prev.lat !== newLat || prev.lng !== newLng)) {
+          heading = calculateBearing(prev.lat, prev.lng, newLat, newLng);
+        } else {
+          heading = currentRiderHeading || 0;
+        }
+      }
+
+      prevCoordsRef.current = { lat: newLat, lng: newLng };
+      setCurrentRiderLat(newLat);
+      setCurrentRiderLng(newLng);
+      setCurrentRiderHeading(heading);
+      setLastSocketPing(new Date().toLocaleTimeString());
+
+      if (riderMarkerRef.current) {
+        riderMarkerRef.current.setLatLng([newLat, newLng]);
+        const el = document.getElementById('live-rider-bike-icon');
+        if (el) {
+          el.style.transform = `rotate(${heading}deg)`;
+        }
+        const needle = document.getElementById('live-rider-heading-needle');
+        if (needle) {
+          needle.style.transform = `translateX(-50%) rotate(${heading}deg)`;
+        }
+      }
+
+      if (routePolylineRef.current) {
+        routePolylineRef.current.setLatLngs([
+          [sLat, sLng],
+          [newLat, newLng],
+          [cLat, cLng],
+        ]);
+      }
+    };
+
     socket.on('riderLocationUpdated', (data: any) => {
       if (data?.orderId === orderId && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
-        setCurrentRiderLat(data.latitude);
-        setCurrentRiderLng(data.longitude);
-        setLastSocketPing(new Date().toLocaleTimeString());
-
-        // Update rider marker position smoothly on Leaflet map
-        if (riderMarkerRef.current) {
-          riderMarkerRef.current.setLatLng([data.latitude, data.longitude]);
-        }
-        if (routePolylineRef.current) {
-          routePolylineRef.current.setLatLngs([
-            [sLat, sLng],
-            [data.latitude, data.longitude],
-            [cLat, cLng],
-          ]);
-        }
+        updateRiderPositionAndHeading(data.latitude, data.longitude, data.heading);
       }
     });
 
     socket.on('driver:location', (data: any) => {
       if (typeof data?.latitude === 'number' && typeof data?.longitude === 'number') {
-        setCurrentRiderLat(data.latitude);
-        setCurrentRiderLng(data.longitude);
-        setLastSocketPing(new Date().toLocaleTimeString());
-
-        if (riderMarkerRef.current) {
-          riderMarkerRef.current.setLatLng([data.latitude, data.longitude]);
-        }
-        if (routePolylineRef.current) {
-          routePolylineRef.current.setLatLngs([
-            [sLat, sLng],
-            [data.latitude, data.longitude],
-            [cLat, cLng],
-          ]);
-        }
+        updateRiderPositionAndHeading(data.latitude, data.longitude, data.heading);
       }
     });
 
@@ -297,23 +325,45 @@ export function OrderGpsTrackingMap({
               position: absolute; width: 44px; height: 44px; border-radius: 50%;
               background: rgba(217, 112, 15, 0.35); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
             "></span>
-            <div style="
-              width: 38px; height: 38px; border-radius: 12px;
-              background: linear-gradient(135deg, #D9700F, #ea580c);
-              color: white; display: flex; align-items: center; justify-content: center;
-              box-shadow: 0 6px 12px rgba(217, 112, 15, 0.4); border: 2.5px solid white;
-              position: relative; z-index: 10;
-            ">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <circle cx="5.5" cy="17.5" r="3.5"></circle>
-                <circle cx="18.5" cy="17.5" r="3.5"></circle>
-                <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h4"></path>
-              </svg>
+            <div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+              {/* Direction Indicator Arrow Needle */}
+              <div id="live-rider-heading-needle" style="
+                position: absolute; top: -14px; left: 50%;
+                transform: translateX(-50%) rotate(${currentRiderHeading}deg);
+                transform-origin: 50% 28px;
+                transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+                z-index: 15; pointer-events: none;
+              ">
+                <div style="
+                  width: 0; height: 0;
+                  border-left: 6px solid transparent;
+                  border-right: 6px solid transparent;
+                  border-bottom: 12px solid #EA580C;
+                  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
+                "></div>
+              </div>
+
+              {/* Rotating Bike Badge */}
+              <div id="live-rider-bike-icon" style="
+                width: 42px; height: 42px; border-radius: 14px;
+                background: linear-gradient(135deg, #EA580C, #C2410C);
+                color: white; display: flex; align-items: center; justify-content: center;
+                box-shadow: 0 8px 16px rgba(234, 88, 12, 0.45); border: 2.5px solid white;
+                position: relative; z-index: 10;
+                transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+                transform: rotate(${currentRiderHeading}deg);
+              ">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="5.5" cy="17.5" r="3.5"></circle>
+                  <circle cx="18.5" cy="17.5" r="3.5"></circle>
+                  <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h4"></path>
+                </svg>
+              </div>
             </div>
           </div>
         `,
-        iconSize: [44, 44],
-        iconAnchor: [22, 22],
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
       });
 
       const riderMarker = L.marker([currentRiderLat, currentRiderLng], { icon: riderIcon }).addTo(map);
@@ -409,6 +459,14 @@ export function OrderGpsTrackingMap({
           </div>
 
           <div className="flex items-center gap-2 text-[#8C6D53]">
+            <span className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200/60 text-[#D9700F]">
+              <Compass
+                className="w-3.5 h-3.5 text-[#D9700F] transition-transform duration-500 ease-out"
+                style={{ transform: `rotate(${currentRiderHeading}deg)` }}
+              />
+              <b className="text-[#6B3A0A]">{Math.round(currentRiderHeading)}°</b>
+            </span>
+            <span>•</span>
             <span>
               Distance: <b className="text-[#6B3A0A]">{distToCustomer.toFixed(2)} km</b>
             </span>
