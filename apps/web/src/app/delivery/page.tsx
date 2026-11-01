@@ -29,6 +29,9 @@ import {
   Zap,
   Wifi,
   WifiOff,
+  Play,
+  Pause,
+  RotateCcw,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/useAuthStore';
@@ -57,6 +60,8 @@ export default function DeliveryDashboardPage() {
   const [riderSpeed, setRiderSpeed] = useState<number>(0);
   const [gpsStatus, setGpsStatus] = useState<string>('GPS Active (DLF Sector Hub)');
   const [isUpdatingGps, setIsUpdatingGps] = useState(false);
+  const [isAutoSimulating, setIsAutoSimulating] = useState(false);
+  const autoSimRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // 1. Fetch available orders ready to be claimed/accepted
   const {
@@ -98,6 +103,12 @@ export default function DeliveryDashboardPage() {
   // WebSocket — emit rider location to /tracking gateway
   const { isConnected: isSocketLive, emitLocation, statusLabel: socketStatus, lastPing } =
     useRiderSocket({ orderId: activeOrderId });
+
+  useEffect(() => {
+    return () => {
+      if (autoSimRef.current) clearInterval(autoSimRef.current);
+    };
+  }, []);
 
   // Background / Active GPS Broadcaster every 4 seconds when continuous broadcast is on
   useEffect(() => {
@@ -218,16 +229,38 @@ export default function DeliveryDashboardPage() {
     );
   };
 
-  // Simulation step: drive closer to customer drop location
-  const handleSimulateMovement = async (order: any) => {
+  // Current GPS coordinates ref for interval closure
+  const gpsRef = React.useRef(currentGps);
+  React.useEffect(() => {
+    gpsRef.current = currentGps;
+  }, [currentGps]);
+
+  // Single step simulation towards destination
+  const handleSimulateMovement = async (order: any, stepRatio = 0.25) => {
     const destLat = order?.address?.latitude || 28.4682;
     const destLng = order?.address?.longitude || 77.0384;
-    const curLat = currentGps.lat;
-    const curLng = currentGps.lng;
+    const curLat = gpsRef.current.lat;
+    const curLng = gpsRef.current.lng;
 
-    // Move 30% closer towards the customer
-    const newLat = curLat + (destLat - curLat) * 0.3;
-    const newLng = curLng + (destLng - curLng) * 0.3;
+    // Distance remaining (approx km)
+    const dLatKm = (destLat - curLat) * 111;
+    const dLngKm = (destLng - curLng) * 111 * Math.cos((curLat * Math.PI) / 180);
+    const distKm = Math.sqrt(dLatKm * dLatKm + dLngKm * dLngKm);
+
+    if (distKm < 0.04) {
+      setGpsStatus(`🏁 Arrived at customer doorstep! (GPS: ${destLat.toFixed(4)}°N, ${destLng.toFixed(4)}°E)`);
+      setRiderSpeed(0);
+      if (autoSimRef.current) {
+        clearInterval(autoSimRef.current);
+        autoSimRef.current = null;
+        setIsAutoSimulating(false);
+      }
+      return;
+    }
+
+    // Move closer towards the customer
+    const newLat = curLat + (destLat - curLat) * stepRatio;
+    const newLng = curLng + (destLng - curLng) * stepRatio;
 
     // Calculate heading bearing towards target
     const dLon = ((destLng - curLng) * Math.PI) / 180;
@@ -236,20 +269,65 @@ export default function DeliveryDashboardPage() {
       Math.cos((curLat * Math.PI) / 180) * Math.sin((destLat * Math.PI) / 180) -
       Math.sin((curLat * Math.PI) / 180) * Math.cos((destLat * Math.PI) / 180) * Math.cos(dLon);
     const heading = Math.round(((Math.atan2(y, x) * 180) / Math.PI + 360) % 360);
+    const speed = Math.floor(Math.random() * 8) + 26; // 26 - 33 km/h
 
     setCurrentGps({ lat: newLat, lng: newLng });
     setCurrentHeading(heading);
-    setRiderSpeed(28);
-    setGpsStatus(`Simulated GPS: ${newLat.toFixed(4)}°N, ${newLng.toFixed(4)}°E (heading: ${heading}° • 28 km/h)`);
+    setRiderSpeed(speed);
+    setGpsStatus(`🚗 Auto-Drive: ${newLat.toFixed(4)}°N, ${newLng.toFixed(4)}°E • ${speed} km/h • ${heading}° (ETA: ${Math.max(1, Math.round(distKm * 3))}m)`);
 
-    // ═ Dual-channel broadcast
-    emitLocation({ latitude: newLat, longitude: newLng, heading, speed: 28 });
+    // Dual-channel broadcast
+    emitLocation({ latitude: newLat, longitude: newLng, heading, speed });
     try {
       await api.post('/delivery/location', {
         latitude: newLat,
         longitude: newLng,
         heading,
-        speed: 28,
+        speed,
+        orderId: order?.id,
+      });
+      await refetchActive();
+    } catch {}
+  };
+
+  // Toggle Auto-Drive Simulator Loop
+  const handleToggleAutoSimulate = (order: any) => {
+    if (isAutoSimulating) {
+      if (autoSimRef.current) clearInterval(autoSimRef.current);
+      autoSimRef.current = null;
+      setIsAutoSimulating(false);
+      setRiderSpeed(0);
+      setGpsStatus('⏸ Auto-Drive Simulator Paused');
+    } else {
+      setIsAutoSimulating(true);
+      setGpsStatus('▶ Auto-Drive Active (Streaming live path every 2.5s)...');
+      handleSimulateMovement(order, 0.15);
+      autoSimRef.current = setInterval(() => {
+        handleSimulateMovement(order, 0.15);
+      }, 2500);
+    }
+  };
+
+  // Reset simulated rider back to Pickup Store
+  const handleResetToStore = async (order: any) => {
+    if (autoSimRef.current) {
+      clearInterval(autoSimRef.current);
+      autoSimRef.current = null;
+      setIsAutoSimulating(false);
+    }
+    const storeLat = order?.store?.latitude || 28.4595;
+    const storeLng = order?.store?.longitude || 77.0266;
+    setCurrentGps({ lat: storeLat, lng: storeLng });
+    setCurrentHeading(0);
+    setRiderSpeed(0);
+    setGpsStatus(`↺ Rider reset to Pickup Store (${storeLat.toFixed(4)}°N, ${storeLng.toFixed(4)}°E)`);
+    emitLocation({ latitude: storeLat, longitude: storeLng, heading: 0, speed: 0 });
+    try {
+      await api.post('/delivery/location', {
+        latitude: storeLat,
+        longitude: storeLng,
+        heading: 0,
+        speed: 0,
         orderId: order?.id,
       });
       await refetchActive();
@@ -457,14 +535,43 @@ export default function DeliveryDashboardPage() {
           </button>
 
           {activeDeliveries.length > 0 && (
-            <button
-              type="button"
-              onClick={() => handleSimulateMovement(activeDeliveries[0]?.order)}
-              className="px-3.5 py-2 bg-purple-50 border border-purple-300 text-purple-700 hover:bg-purple-700 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-            >
-              <Navigation className="w-3.5 h-3.5" />
-              <span>Simulate Movement (Drive closer)</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Auto Drive Simulation Loop */}
+              <button
+                type="button"
+                onClick={() => handleToggleAutoSimulate(activeDeliveries[0]?.order)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm ${
+                  isAutoSimulating
+                    ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse shadow-red-500/30'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
+                }`}
+              >
+                {isAutoSimulating ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                <span>{isAutoSimulating ? 'Pause Auto-Drive' : '▶ Auto-Drive Simulator'}</span>
+              </button>
+
+              {/* Single Step Drive Closer */}
+              <button
+                type="button"
+                onClick={() => handleSimulateMovement(activeDeliveries[0]?.order, 0.25)}
+                className="px-3 py-2 bg-purple-50 border border-purple-300 text-purple-700 hover:bg-purple-700 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                title="Drive 25% closer to customer"
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                <span>Step Closer</span>
+              </button>
+
+              {/* Reset to Store Hub */}
+              <button
+                type="button"
+                onClick={() => handleResetToStore(activeDeliveries[0]?.order)}
+                className="px-2.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition-all flex items-center gap-1 shadow-sm"
+                title="Reset rider position to pickup store"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset Hub</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

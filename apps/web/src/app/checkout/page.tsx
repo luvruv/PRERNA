@@ -782,7 +782,7 @@ export default function CheckoutPage() {
                 <span className="font-bold text-[#D9700F]">₹{cart.deliveryFee}</span>
               </div>
               <div className="flex justify-between text-[#8C6D53]">
-                <span>Taxes & Packaging (5%)</span>
+                <div className="flex flex-col"><span>GST & Packaging (5%)</span><span className="text-[10px] text-[#A66C3E]">CGST 2.5% + SGST 2.5% • MRP incl. GST</span></div>
                 <span>₹{cart.tax}</span>
               </div>
               <div className="border-t border-[#F7E3CF] pt-3 flex justify-between text-base font-black text-[#6B3A0A]">

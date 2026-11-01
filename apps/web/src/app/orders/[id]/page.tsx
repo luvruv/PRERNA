@@ -373,7 +373,7 @@ export default function OrderTrackingPage() {
               <span>₹{order.deliveryFee}</span>
             </div>
             <div className="flex justify-between text-[#8C6D53]">
-              <span>Taxes</span>
+              <div className="flex flex-col"><span>GST (CGST 2.5% + SGST 2.5%)</span><span className="text-[10px] text-[#A66C3E]">Tax Invoice • MRP incl. item GST</span></div>
               <span>₹{order.tax}</span>
             </div>
             <div className="border-t border-[#F7E3CF] pt-2 flex justify-between font-black text-sm text-[#D9700F]">
