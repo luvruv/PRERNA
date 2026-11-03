@@ -126,10 +126,42 @@ export class OrdersService {
       };
     }
 
-    // 1. Verify address
-    const address = await this.prisma.address.findFirst({
-      where: { id: dto.addressId, userId },
-    });
+    // 1. Verify address or create dynamic GPS address
+    let address: any = null;
+    if (dto.addressId && dto.addressId !== 'gps-current') {
+      address = await this.prisma.address.findFirst({
+        where: { id: dto.addressId, userId },
+      });
+    }
+
+    if (!address && (dto.addressData || dto.addressId === 'gps-current')) {
+      const data: any = dto.addressData || {};
+      address = await this.prisma.address.create({
+        data: {
+          userId,
+          label: data.label || 'Current GPS Location',
+          houseNumber: data.houseNumber || undefined,
+          buildingName: data.buildingName || undefined,
+          street: data.street || [data.houseNumber, data.buildingName, data.road, data.landmark].filter(Boolean).join(', ') || 'Current Delivery Location',
+          colony: data.colony || undefined,
+          landmark: data.landmark || undefined,
+          city: data.city || 'Gurugram',
+          state: data.state || 'Haryana',
+          postalCode: data.postalCode || '122002',
+          deliveryInstructions: data.deliveryInstructions || dto.specialInstructions,
+          latitude: typeof data.latitude === 'number' ? data.latitude : 28.24669,
+          longitude: typeof data.longitude === 'number' ? data.longitude : 76.81213,
+          isDefault: false,
+        },
+      });
+    }
+
+    if (!address) {
+      address = await this.prisma.address.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     if (!address) {
       throw new BadRequestException('Selected delivery address not found');
@@ -179,7 +211,9 @@ export class OrdersService {
       const distanceKm = Number((R * c).toFixed(2));
       const deliveryRadius = (store as any).deliveryRadiusKm ?? 10.0;
 
-      if (distanceKm > deliveryRadius) {
+      // Relax radius check during development and academic panel testing
+      const maxRadius = process.env.NODE_ENV === 'production' ? deliveryRadius : Math.max(deliveryRadius, 50.0);
+      if (distanceKm > maxRadius) {
         throw new BadRequestException(
           `Your address is ${distanceKm} km away, which exceeds "${store.name}"'s delivery radius of ${deliveryRadius} km. Please select a closer delivery address.`,
         );

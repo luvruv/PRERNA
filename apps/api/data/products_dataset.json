@@ -181,7 +181,7 @@
     "mrp": 140,
     "unit": "500 g box",
     "sku": "FRU-GRA-008",
-    "availableQty": 40,
+    "availableQty": 42,
     "reservedQty": 0,
     "lowStockThreshold": 10,
     "stockStatus": "IN_STOCK",
@@ -189,7 +189,7 @@
     "imageUrl": "https://images.unsplash.com/photo-1596363505729-4190a9506133?auto=format&fit=crop&w=600&q=80",
     "rating": 4.7,
     "createdAt": "2026-10-11T09:21:14.006Z",
-    "updatedAt": "2026-10-19T18:21:14.006Z"
+    "updatedAt": "2026-11-03T08:30:14.949Z"
   },
   {
     "id": "prod-9",
@@ -205,7 +205,7 @@
     "mrp": 95,
     "unit": "1 pc (approx 800 g)",
     "sku": "FRU-PIN-009",
-    "availableQty": 22,
+    "availableQty": 24,
     "reservedQty": 0,
     "lowStockThreshold": 10,
     "stockStatus": "IN_STOCK",
@@ -213,7 +213,7 @@
     "imageUrl": "https://images.unsplash.com/photo-1550258987-190a2d41a8ba?auto=format&fit=crop&w=600&q=80",
     "rating": 4.8,
     "createdAt": "2026-10-11T10:21:14.006Z",
-    "updatedAt": "2026-10-19T18:21:14.006Z"
+    "updatedAt": "2026-11-03T08:30:14.946Z"
   },
   {
     "id": "prod-10",

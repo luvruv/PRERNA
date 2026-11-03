@@ -1,5 +1,70 @@
 [
   {
+    "id": "ord-1793694614946",
+    "orderNumber": "PRN-20261103-2165",
+    "timestamp": "2026-11-03T08:30:14.946Z",
+    "customer": {
+      "userId": "demo-customer-id",
+      "name": "Prerna Panel Customer",
+      "email": "customer@gmail.com",
+      "phone": "+91 99887 00000"
+    },
+    "store": {
+      "storeId": "store-1",
+      "name": "Sunrise Fresh Market",
+      "address": "Shop 14-16, Galleria Market, DLF Phase 4, Gurugram"
+    },
+    "deliveryAddress": {
+      "label": "Home",
+      "street": "Flat 402, DLF Phase 4, Galleria Road, Sector 28",
+      "city": "Gurugram",
+      "state": "Haryana",
+      "postalCode": "122002",
+      "latitude": 28.4682,
+      "longitude": 77.0851
+    },
+    "items": [
+      {
+        "productId": "prod-9",
+        "name": "Queen Juicy Pineapple",
+        "price": 75,
+        "quantity": 2,
+        "subtotal": 150,
+        "unit": "1 pc (approx 800 g)"
+      },
+      {
+        "productId": "prod-8",
+        "name": "Thompson Seedless Green Grapes",
+        "price": 110,
+        "quantity": 2,
+        "subtotal": 220,
+        "unit": "500 g box"
+      }
+    ],
+    "billing": {
+      "subtotal": 370,
+      "deliveryFee": 25,
+      "tax": 18.5,
+      "totalAmount": 413.5
+    },
+    "payment": {
+      "transactionId": "TXN_PAY_94614946",
+      "method": "COD",
+      "status": "COMPLETED",
+      "paidAt": "2026-11-03T08:30:14.946Z"
+    },
+    "orderStatus": "CONFIRMED",
+    "deliveryAssignment": {
+      "riderName": "Vikram Singh (Electric Bike)",
+      "riderPhone": "+91 98765 43213",
+      "vehicle": "Ather 450X - DL 01 EX 2026",
+      "status": "ASSIGNED",
+      "currentLat": 28.465,
+      "currentLng": 77.0865,
+      "estimatedDeliveryMins": 10
+    }
+  },
+  {
     "id": "ord-1792436952120",
     "orderNumber": "PRN-20261019-7263",
     "timestamp": "2026-10-19T19:09:12.120Z",

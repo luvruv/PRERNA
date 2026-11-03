@@ -164,6 +164,23 @@ export default function DeliveryDashboardPage() {
     }
   }, [activeDeliveries.length, availableOrders.length]);
 
+  // Synchronize initial rider position to order hub (under 2 km from customer)
+  useEffect(() => {
+    if (activeDeliveries.length > 0) {
+      const ord = activeDeliveries[0]?.order;
+      if (ord) {
+        const { lat, lng } = getNearbyRiderStartingPoint(ord);
+        setCurrentGps(prev => {
+          // If at generic default coords, set to order hub
+          if (prev.lat === 28.4595 && prev.lng === 77.0266) {
+            return { lat, lng };
+          }
+          return prev;
+        });
+      }
+    }
+  }, [activeDeliveries]);
+
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 animate-pulse space-y-6">
@@ -306,24 +323,50 @@ export default function DeliveryDashboardPage() {
     }
   };
 
-  // Reset simulated rider back to Pickup Store
+  // Helper to ensure Rider starting position is within 2 km of customer for realistic presentation
+  const getNearbyRiderStartingPoint = (order: any) => {
+    const cLat = order?.address?.latitude || 28.4682;
+    const cLng = order?.address?.longitude || 77.0384;
+    let sLat = order?.store?.latitude || 28.4595;
+    let sLng = order?.store?.longitude || 77.0266;
+
+    const R = 6371;
+    const dLat = ((cLat - sLat) * Math.PI) / 180;
+    const dLon = ((cLng - sLng) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((sLat * Math.PI) / 180) *
+        Math.cos((cLat * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const distKm = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * R;
+
+    // If store is farther than 2 km, position rider at a 1.2 km hub along the route
+    if (distKm > 2.0) {
+      const ratio = 1.2 / distKm;
+      sLat = Number((cLat + (sLat - cLat) * ratio).toFixed(5));
+      sLng = Number((cLng + (sLng - cLng) * ratio).toFixed(5));
+    }
+    return { lat: sLat, lng: sLng };
+  };
+
+  // Reset simulated rider back to Pickup Store (guaranteed within 2 km of customer)
   const handleResetToStore = async (order: any) => {
     if (autoSimRef.current) {
       clearInterval(autoSimRef.current);
       autoSimRef.current = null;
       setIsAutoSimulating(false);
     }
-    const storeLat = order?.store?.latitude || 28.4595;
-    const storeLng = order?.store?.longitude || 77.0266;
-    setCurrentGps({ lat: storeLat, lng: storeLng });
+    const { lat: startLat, lng: startLng } = getNearbyRiderStartingPoint(order);
+    setCurrentGps({ lat: startLat, lng: startLng });
     setCurrentHeading(0);
     setRiderSpeed(0);
-    setGpsStatus(`↺ Rider reset to Pickup Store (${storeLat.toFixed(4)}°N, ${storeLng.toFixed(4)}°E)`);
-    emitLocation({ latitude: storeLat, longitude: storeLng, heading: 0, speed: 0 });
+    setGpsStatus(`↺ Rider reset to Pickup Hub (${startLat.toFixed(4)}°N, ${startLng.toFixed(4)}°E • ~1.2 km to drop)`);
+    emitLocation({ latitude: startLat, longitude: startLng, heading: 0, speed: 0 });
     try {
       await api.post('/delivery/location', {
-        latitude: storeLat,
-        longitude: storeLng,
+        latitude: startLat,
+        longitude: startLng,
         heading: 0,
         speed: 0,
         orderId: order?.id,
