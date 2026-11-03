@@ -62,6 +62,10 @@ export default function DeliveryDashboardPage() {
   const [isUpdatingGps, setIsUpdatingGps] = useState(false);
   const [isAutoSimulating, setIsAutoSimulating] = useState(false);
   const autoSimRef = React.useRef<NodeJS.Timeout | null>(null);
+  const gpsRef = React.useRef(currentGps);
+  useEffect(() => {
+    gpsRef.current = currentGps;
+  }, [currentGps]);
 
   // 1. Fetch available orders ready to be claimed/accepted
   const {
@@ -228,12 +232,6 @@ export default function DeliveryDashboardPage() {
       { enableHighAccuracy: true, timeout: 10000 },
     );
   };
-
-  // Current GPS coordinates ref for interval closure
-  const gpsRef = React.useRef(currentGps);
-  React.useEffect(() => {
-    gpsRef.current = currentGps;
-  }, [currentGps]);
 
   // Single step simulation towards destination
   const handleSimulateMovement = async (order: any, stepRatio = 0.25) => {
