@@ -12,6 +12,9 @@ import {
   Wifi,
   WifiOff,
   Clock,
+  Gauge,
+  Zap,
+  CheckCircle2,
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -57,6 +60,7 @@ export function OrderGpsTrackingMap({
   const [currentRiderLat, setCurrentRiderLat] = useState<number>(riderLat || (sLat + cLat) / 2);
   const [currentRiderLng, setCurrentRiderLng] = useState<number>(riderLng || (sLng + cLng) / 2);
   const [currentRiderHeading, setCurrentRiderHeading] = useState<number>(0);
+  const [currentRiderSpeed, setCurrentRiderSpeed] = useState<number>(28);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [lastSocketPing, setLastSocketPing] = useState<string | null>(null);
 
@@ -106,8 +110,18 @@ export function OrderGpsTrackingMap({
   });
 
   const distToCustomer = getDistanceKm(currentRiderLat, currentRiderLng, cLat, cLng);
-  const totalTripDist = getDistanceKm(sLat, sLng, cLat, cLng);
-  const estMins = Math.max(2, Math.round(distToCustomer * 3.5));
+  const totalTripDist = Math.max(0.1, getDistanceKm(sLat, sLng, cLat, cLng));
+  
+  // Real-time dynamic ETA based on current rider velocity (km/h)
+  const effectiveSpeed = currentRiderSpeed > 5 ? currentRiderSpeed : 25;
+  const calculatedMins = Math.max(1, Math.round((distToCustomer / effectiveSpeed) * 60));
+  const estMins = distToCustomer < 0.04 ? 0 : calculatedMins;
+  const formattedDistance = distToCustomer < 1 
+    ? `${Math.round(distToCustomer * 1000)} meters` 
+    : `${distToCustomer.toFixed(2)} km`;
+  const expectedTimeStr = estMins === 0 
+    ? 'Arriving at Doorstep' 
+    : new Date(Date.now() + estMins * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   // Determine progress percentage based on order lifecycle
   let progressPct = 20;
@@ -164,7 +178,12 @@ export function OrderGpsTrackingMap({
       );
     });
 
-    const updateRiderPositionAndHeading = (newLat: number, newLng: number, explicitHeading?: number) => {
+    const updateRiderPositionAndHeading = (
+      newLat: number, 
+      newLng: number, 
+      explicitHeading?: number, 
+      explicitSpeed?: number
+    ) => {
       let heading = explicitHeading;
       if (typeof heading !== 'number' || isNaN(heading)) {
         const prev = prevCoordsRef.current;
@@ -173,6 +192,10 @@ export function OrderGpsTrackingMap({
         } else {
           heading = currentRiderHeading || 0;
         }
+      }
+
+      if (typeof explicitSpeed === 'number' && explicitSpeed > 0) {
+        setCurrentRiderSpeed(explicitSpeed);
       }
 
       prevCoordsRef.current = { lat: newLat, lng: newLng };
@@ -200,17 +223,24 @@ export function OrderGpsTrackingMap({
           [cLat, cLng],
         ]);
       }
+
+      if (mapInstanceRef.current) {
+        const currentBounds = mapInstanceRef.current.getBounds();
+        if (!currentBounds.contains([newLat, newLng])) {
+          mapInstanceRef.current.panTo([newLat, newLng], { animate: true });
+        }
+      }
     };
 
     socket.on('riderLocationUpdated', (data: any) => {
       if (data?.orderId === orderId && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
-        updateRiderPositionAndHeading(data.latitude, data.longitude, data.heading);
+        updateRiderPositionAndHeading(data.latitude, data.longitude, data.heading, data.speed);
       }
     });
 
     socket.on('driver:location', (data: any) => {
       if (typeof data?.latitude === 'number' && typeof data?.longitude === 'number') {
-        updateRiderPositionAndHeading(data.latitude, data.longitude, data.heading);
+        updateRiderPositionAndHeading(data.latitude, data.longitude, data.heading, data.speed);
       }
     });
 
@@ -496,6 +526,63 @@ export function OrderGpsTrackingMap({
           <span className="flex items-center gap-1">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" /> Customer Drop
           </span>
+        </div>
+      </div>
+
+      {/* Real-Time Delivery & Time Analysis Dashboard */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+        {/* Metric 1: ETA & Time Analysis */}
+        <div className="bg-[#FAF3EB]/70 border border-[#F0DEC8] rounded-2xl p-4 flex items-center gap-3.5 shadow-sm">
+          <div className="w-11 h-11 rounded-2xl bg-orange-100 text-[#D9700F] flex items-center justify-center shrink-0 shadow-inner">
+            <Clock className="w-6 h-6 animate-pulse" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#8C6D53] block">
+              Estimated Arrival
+            </span>
+            <div className="text-lg font-black text-[#6B3A0A] truncate">
+              {estMins === 0 ? 'Arriving Now!' : `~${estMins} Minutes`}
+            </div>
+            <span className="text-[11px] font-semibold text-[#D9700F] block">
+              Drop ETA: {expectedTimeStr}
+            </span>
+          </div>
+        </div>
+
+        {/* Metric 2: Live Distance Remaining */}
+        <div className="bg-[#FAF3EB]/70 border border-[#F0DEC8] rounded-2xl p-4 flex items-center gap-3.5 shadow-sm">
+          <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 shadow-inner">
+            <Navigation className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#8C6D53] block">
+              Distance to Doorstep
+            </span>
+            <div className="text-lg font-black text-emerald-800 truncate">
+              {formattedDistance}
+            </div>
+            <span className="text-[11px] font-medium text-[#8C6D53] block truncate">
+              To: {customerAddress || customerLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* Metric 3: Live Speed & Status */}
+        <div className="bg-[#FAF3EB]/70 border border-[#F0DEC8] rounded-2xl p-4 flex items-center gap-3.5 shadow-sm">
+          <div className="w-11 h-11 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 shadow-inner">
+            <Gauge className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#8C6D53] block">
+              Rider Velocity & Status
+            </span>
+            <div className="text-lg font-black text-purple-900 truncate">
+              {currentRiderSpeed} km/h
+            </div>
+            <span className="text-[11px] font-semibold text-purple-700 block truncate">
+              {orderStatus === 'OUT_FOR_DELIVERY' ? 'En Route (Driving Closer)' : orderStatus.replace(/_/g, ' ')}
+            </span>
+          </div>
         </div>
       </div>
 
