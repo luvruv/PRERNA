@@ -49,53 +49,59 @@ export default function Navbar() {
     }
   };
 
-  const isDashboardPage =
-    pathname.startsWith('/shopkeeper') ||
-    pathname.startsWith('/delivery') ||
-    pathname.startsWith('/admin');
+  const isShopkeeperPage = pathname.startsWith('/shopkeeper');
+  const isOperationalUser = user?.role === 'SHOPKEEPER' || user?.role === 'DELIVERY_PARTNER';
+  const portalHref = user?.role === 'SHOPKEEPER'
+    ? '/shopkeeper'
+    : user?.role === 'DELIVERY_PARTNER'
+      ? '/delivery'
+      : '/';
 
   return (
     <>
       <LocationPickerModal />
       <header className="sticky top-0 z-40 bg-[#FAF3EB]/95 backdrop-blur-md border-b border-[#F0DEC8]">
-        {/* Top micro-bar for quick demo role navigation */}
-        <div className="bg-[#6B3A0A] text-[#FDF1E6] text-xs py-1 px-4">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-[#D9700F]">⚡ 10-Min Delivery</span>
-              <span className="hidden sm:inline text-cream-200">
-                | Serving {mounted ? (location.label || location.address || 'DLF Phase 1-5, Gurugram') : 'DLF Phase 1-5, Gurugram'}
-              </span>
+        {!isOperationalUser && (
+          <div className="bg-[#6B3A0A] text-[#FDF1E6] text-xs py-1 px-4">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              {!isShopkeeperPage && (
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-[#D9700F]">⚡ 10-Min Delivery</span>
+                  <span className="hidden sm:inline text-cream-200">
+                    | Serving {mounted ? (location.label || location.address || 'DLF Phase 1-5, Gurugram') : 'DLF Phase 1-5, Gurugram'}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-3">
+                <span className="text-cream-300 hidden md:inline">Demo Dashboards:</span>
+                <Link
+                  href="/shopkeeper"
+                  className="hover:text-primary transition-colors flex items-center gap-1 font-medium"
+                >
+                  <Store className="w-3 h-3" /> Shopkeeper
+                </Link>
+                <Link
+                  href="/delivery"
+                  className="hover:text-primary transition-colors flex items-center gap-1 font-medium"
+                >
+                  <Bike className="w-3 h-3" /> Delivery
+                </Link>
+                <Link
+                  href="/admin"
+                  className="hover:text-primary transition-colors flex items-center gap-1 font-medium"
+                >
+                  <ShieldCheck className="w-3 h-3" /> Admin
+                </Link>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-            <span className="text-cream-300 hidden md:inline">Demo Dashboards:</span>
-            <Link
-              href="/shopkeeper"
-              className="hover:text-primary transition-colors flex items-center gap-1 font-medium"
-            >
-              <Store className="w-3 h-3" /> Shopkeeper
-            </Link>
-            <Link
-              href="/delivery"
-              className="hover:text-primary transition-colors flex items-center gap-1 font-medium"
-            >
-              <Bike className="w-3 h-3" /> Delivery
-            </Link>
-            <Link
-              href="/admin"
-              className="hover:text-primary transition-colors flex items-center gap-1 font-medium"
-            >
-              <ShieldCheck className="w-3 h-3" /> Admin
-            </Link>
           </div>
-        </div>
-      </div>
+        )}
 
       {/* Main Navbar */}
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
         {/* Brand Logo & Location */}
         <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href={portalHref} className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-xl bg-[#D9700F] flex items-center justify-center text-white font-black text-xl shadow-md shadow-orange-500/20">
               P
             </div>
@@ -111,32 +117,34 @@ export default function Navbar() {
 
 
           {/* Delivery Location badge */}
-          <button
-            type="button"
-            onClick={openPicker}
-            className="flex items-center gap-2 px-3 py-1.5 bg-white/90 hover:bg-white rounded-full border border-[#F0DEC8] hover:border-[#D9700F] text-xs text-[#6B3A0A] transition-all shadow-sm hover:shadow group text-left cursor-pointer"
-            title="Click to change delivery location or use device GPS"
-          >
-            <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-[#D9700F] group-hover:scale-110 transition-transform">
-              <MapPin className="w-3.5 h-3.5" />
-            </div>
-            <div className="flex flex-col text-left">
-              <span className="font-black text-[11px] leading-tight text-[#6B3A0A] flex items-center gap-1">
-                <span>Delivery in 10 Mins</span>
-                {mounted && location.isGps && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" title="Using Live GPS" />
-                )}
-              </span>
-              <span className="text-[10px] text-[#8C6D53] truncate max-w-[130px]">
-                {(mounted && (location.label || location.address)) || 'Select location'}
-              </span>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-[#A66C3E] group-hover:text-[#D9700F] transition-colors" />
-          </button>
+          {!isShopkeeperPage && !isOperationalUser && (
+            <button
+              type="button"
+              onClick={openPicker}
+              className="flex items-center gap-2 px-3 py-1.5 bg-white/90 hover:bg-white rounded-full border border-[#F0DEC8] hover:border-[#D9700F] text-xs text-[#6B3A0A] transition-all shadow-sm hover:shadow group text-left cursor-pointer"
+              title="Click to change delivery location or use device GPS"
+            >
+              <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-[#D9700F] group-hover:scale-110 transition-transform">
+                <MapPin className="w-3.5 h-3.5" />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="font-black text-[11px] leading-tight text-[#6B3A0A] flex items-center gap-1">
+                  <span>Delivery in 10 Mins</span>
+                  {mounted && location.isGps && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" title="Using Live GPS" />
+                  )}
+                </span>
+                <span className="text-[10px] text-[#8C6D53] truncate max-w-[130px]">
+                  {(mounted && (location.label || location.address)) || 'Select location'}
+                </span>
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 text-[#A66C3E] group-hover:text-[#D9700F] transition-colors" />
+            </button>
+          )}
         </div>
 
         {/* Global Search input */}
-        <form
+        {!isOperationalUser && <form
           onSubmit={handleSearchSubmit}
           className="flex-1 max-w-xl hidden md:flex items-center relative"
         >
@@ -156,17 +164,17 @@ export default function Navbar() {
               Search
             </button>
           )}
-        </form>
+        </form>}
 
         {/* Right Action Buttons */}
         <div className="flex items-center gap-3">
           {/* Quick links to stores and categories */}
-          <Link
+          {!isOperationalUser && <Link
             href="/stores"
             className="hidden sm:flex text-sm font-semibold text-[#6B3A0A] hover:text-[#D9700F] px-3 py-2 rounded-lg transition-colors"
           >
             Stores
-          </Link>
+          </Link>}
 
           {/* User Account / Login */}
           {mounted && isAuthenticated && user ? (
@@ -195,21 +203,25 @@ export default function Navbar() {
                     </div>
                   </div>
 
-                  <Link
-                    href="/profile"
-                    onClick={() => setUserDropdownOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-[#4A321F] hover:bg-[#FDF1E6] hover:text-[#D9700F]"
-                  >
-                    <UserIcon className="w-4 h-4" /> My Profile & Addresses
-                  </Link>
+                  {!isOperationalUser && (
+                    <>
+                      <Link
+                        href="/profile"
+                        onClick={() => setUserDropdownOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-[#4A321F] hover:bg-[#FDF1E6] hover:text-[#D9700F]"
+                      >
+                        <UserIcon className="w-4 h-4" /> My Profile & Addresses
+                      </Link>
 
-                  <Link
-                    href="/orders"
-                    onClick={() => setUserDropdownOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-[#4A321F] hover:bg-[#FDF1E6] hover:text-[#D9700F]"
-                  >
-                    <Package className="w-4 h-4" /> My Orders & Tracking
-                  </Link>
+                      <Link
+                        href="/orders"
+                        onClick={() => setUserDropdownOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-[#4A321F] hover:bg-[#FDF1E6] hover:text-[#D9700F]"
+                      >
+                        <Package className="w-4 h-4" /> My Orders & Tracking
+                      </Link>
+                    </>
+                  )}
 
                   {user.role === 'SHOPKEEPER' && (
                     <Link
@@ -267,7 +279,7 @@ export default function Navbar() {
           )}
 
           {/* Cart Floating / Sticky CTA */}
-          <Link
+          {!isOperationalUser && <Link
             href="/cart"
             className="flex items-center gap-2.5 px-4 py-2.5 bg-[#D9700F] text-white rounded-full font-bold text-xs sm:text-sm hover:bg-primary-hover shadow-md shadow-orange-500/25 transition-all transform active:scale-95"
           >
@@ -282,12 +294,12 @@ export default function Navbar() {
             <span className="hidden sm:inline">
               {mounted && cart.totalItems > 0 ? `₹${cart.total}` : 'My Cart'}
             </span>
-          </Link>
+          </Link>}
         </div>
       </div>
 
       {/* Mobile search bar visible on small devices */}
-      <div className="px-4 pb-2.5 md:hidden">
+      {!isOperationalUser && <div className="px-4 pb-2.5 md:hidden">
         <form onSubmit={handleSearchSubmit} className="relative">
           <Search className="w-4 h-4 text-[#A66C3E] absolute left-3.5 top-3 pointer-events-none" />
           <input
@@ -298,7 +310,7 @@ export default function Navbar() {
             className="w-full pl-10 pr-4 py-2 bg-white rounded-full border border-[#F0DEC8] text-xs text-[#2D1B0D] placeholder-[#A66C3E]/70 focus:outline-none focus:border-[#D9700F]"
           />
         </form>
-      </div>
+      </div>}
       </header>
     </>
   );

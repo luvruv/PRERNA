@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import { RiderMiniRouteMap } from '@/components/delivery/RiderMiniRouteMap';
+import { DeliveryRouteSimulator } from '@/components/delivery/DeliveryRouteSimulator';
 import { useRiderSocket } from '@/lib/hooks/useRiderSocket';
 
 export default function DeliveryDashboardPage() {
@@ -43,7 +43,10 @@ export default function DeliveryDashboardPage() {
   const [isOnline, setIsOnline] = useState(true);
   const [activeTab, setActiveTab] = useState<'AVAILABLE' | 'ACTIVE' | 'HISTORY'>('ACTIVE');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [isContinuousBroadcasting, setIsContinuousBroadcasting] = useState(true);
+  // Real-device GPS streaming is opt-in and is paused while the virtual demo rider is running,
+  // so real GPS and the clearly-labelled simulation never mix on the customer's map.
+  const [isContinuousBroadcasting, setIsContinuousBroadcasting] = useState(false);
+  const [isRouteSimulating, setIsRouteSimulating] = useState(false);
   const [deliveryOtp, setDeliveryOtp] = useState<Record<string, string>>({});
   const [showOtpInput, setShowOtpInput] = useState<Record<string, boolean>>({});
 
@@ -58,14 +61,8 @@ export default function DeliveryDashboardPage() {
   });
   const [currentHeading, setCurrentHeading] = useState<number>(0);
   const [riderSpeed, setRiderSpeed] = useState<number>(0);
-  const [gpsStatus, setGpsStatus] = useState<string>('GPS Active (DLF Sector Hub)');
+  const [gpsStatus, setGpsStatus] = useState<string>('GPS not captured yet');
   const [isUpdatingGps, setIsUpdatingGps] = useState(false);
-  const [isAutoSimulating, setIsAutoSimulating] = useState(false);
-  const autoSimRef = React.useRef<NodeJS.Timeout | null>(null);
-  const gpsRef = React.useRef(currentGps);
-  useEffect(() => {
-    gpsRef.current = currentGps;
-  }, [currentGps]);
 
   // 1. Fetch available orders ready to be claimed/accepted
   const {
@@ -108,15 +105,16 @@ export default function DeliveryDashboardPage() {
   const { isConnected: isSocketLive, emitLocation, statusLabel: socketStatus, lastPing } =
     useRiderSocket({ orderId: activeOrderId });
 
-  useEffect(() => {
-    return () => {
-      if (autoSimRef.current) clearInterval(autoSimRef.current);
-    };
-  }, []);
-
   // Background / Active GPS Broadcaster every 4 seconds when continuous broadcast is on
   useEffect(() => {
-    if (!isContinuousBroadcasting || typeof window === 'undefined' || !navigator.geolocation) return;
+    if (
+      !isContinuousBroadcasting ||
+      isRouteSimulating ||
+      !activeOrderId ||
+      typeof window === 'undefined' ||
+      !navigator.geolocation
+    )
+      return;
 
     let watchId: number;
     try {
@@ -132,14 +130,14 @@ export default function DeliveryDashboardPage() {
           setGpsStatus(`Live GPS: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E • ${Math.round(speed * 3.6)} km/h • ${Math.round(heading)}°`);
 
           // ═ Dual-channel: REST (persist) + WebSocket (real-time broadcast)
-          emitLocation({ latitude: lat, longitude: lng, heading, speed: Math.round(speed * 3.6) });
+          emitLocation({ latitude: lat, longitude: lng, heading, speed: Math.round(speed * 3.6), source: 'GPS' });
           try {
             await api.post('/delivery/location', {
               latitude: lat,
               longitude: lng,
               heading,
               speed,
-              orderId: activeDeliveries[0]?.order?.id,
+              orderId: activeOrderId,
             });
           } catch {}
         },
@@ -155,7 +153,7 @@ export default function DeliveryDashboardPage() {
         navigator.geolocation.clearWatch(watchId);
       }
     };
-  }, [isContinuousBroadcasting, activeDeliveries]);
+  }, [isContinuousBroadcasting, isRouteSimulating, activeOrderId]);
 
   // Automatically switch to AVAILABLE if no active deliveries but available requests exist
   useEffect(() => {
@@ -163,23 +161,6 @@ export default function DeliveryDashboardPage() {
       setActiveTab('AVAILABLE');
     }
   }, [activeDeliveries.length, availableOrders.length]);
-
-  // Synchronize initial rider position to order hub (under 2 km from customer)
-  useEffect(() => {
-    if (activeDeliveries.length > 0) {
-      const ord = activeDeliveries[0]?.order;
-      if (ord) {
-        const { lat, lng } = getNearbyRiderStartingPoint(ord);
-        setCurrentGps(prev => {
-          // If at generic default coords, set to order hub
-          if (prev.lat === 28.4595 && prev.lng === 77.0266) {
-            return { lat, lng };
-          }
-          return prev;
-        });
-      }
-    }
-  }, [activeDeliveries]);
 
   if (isLoading) {
     return (
@@ -198,19 +179,23 @@ export default function DeliveryDashboardPage() {
       setActiveTab('ACTIVE');
     } catch (err: any) {
       alert(err.message || 'Failed to accept delivery request');
+      // Another rider may have taken it - refresh the pool so the stale card disappears
+      await refetchAvailable();
     } finally {
       setActionLoading(null);
     }
   };
 
   // Delivery partner advances delivery lifecycle
-  const handleUpdateStatus = async (orderId: string, status: string, notes?: string) => {
+  const handleUpdateStatus = async (orderId: string, status: string, notes?: string): Promise<boolean> => {
     setActionLoading(orderId);
     try {
       await api.patch(`/delivery/orders/${orderId}/status`, { status, notes });
       await Promise.all([refetchActive(), refetchHistory()]);
+      return true;
     } catch (err: any) {
       alert(err.message || 'Status transition failed');
+      return false;
     } finally {
       setActionLoading(null);
     }
@@ -248,131 +233,6 @@ export default function DeliveryDashboardPage() {
       },
       { enableHighAccuracy: true, timeout: 10000 },
     );
-  };
-
-  // Single step simulation towards destination
-  const handleSimulateMovement = async (order: any, stepRatio = 0.25) => {
-    const destLat = order?.address?.latitude || 28.4682;
-    const destLng = order?.address?.longitude || 77.0384;
-    const curLat = gpsRef.current.lat;
-    const curLng = gpsRef.current.lng;
-
-    // Distance remaining (approx km)
-    const dLatKm = (destLat - curLat) * 111;
-    const dLngKm = (destLng - curLng) * 111 * Math.cos((curLat * Math.PI) / 180);
-    const distKm = Math.sqrt(dLatKm * dLatKm + dLngKm * dLngKm);
-
-    if (distKm < 0.04) {
-      setGpsStatus(`🏁 Arrived at customer doorstep! (GPS: ${destLat.toFixed(4)}°N, ${destLng.toFixed(4)}°E)`);
-      setRiderSpeed(0);
-      if (autoSimRef.current) {
-        clearInterval(autoSimRef.current);
-        autoSimRef.current = null;
-        setIsAutoSimulating(false);
-      }
-      return;
-    }
-
-    // Move closer towards the customer
-    const newLat = curLat + (destLat - curLat) * stepRatio;
-    const newLng = curLng + (destLng - curLng) * stepRatio;
-
-    // Calculate heading bearing towards target
-    const dLon = ((destLng - curLng) * Math.PI) / 180;
-    const y = Math.sin(dLon) * Math.cos((destLat * Math.PI) / 180);
-    const x =
-      Math.cos((curLat * Math.PI) / 180) * Math.sin((destLat * Math.PI) / 180) -
-      Math.sin((curLat * Math.PI) / 180) * Math.cos((destLat * Math.PI) / 180) * Math.cos(dLon);
-    const heading = Math.round(((Math.atan2(y, x) * 180) / Math.PI + 360) % 360);
-    const speed = Math.floor(Math.random() * 8) + 26; // 26 - 33 km/h
-
-    setCurrentGps({ lat: newLat, lng: newLng });
-    setCurrentHeading(heading);
-    setRiderSpeed(speed);
-    setGpsStatus(`🚗 Auto-Drive: ${newLat.toFixed(4)}°N, ${newLng.toFixed(4)}°E • ${speed} km/h • ${heading}° (ETA: ${Math.max(1, Math.round(distKm * 3))}m)`);
-
-    // Dual-channel broadcast
-    emitLocation({ latitude: newLat, longitude: newLng, heading, speed });
-    try {
-      await api.post('/delivery/location', {
-        latitude: newLat,
-        longitude: newLng,
-        heading,
-        speed,
-        orderId: order?.id,
-      });
-      await refetchActive();
-    } catch {}
-  };
-
-  // Toggle Auto-Drive Simulator Loop
-  const handleToggleAutoSimulate = (order: any) => {
-    if (isAutoSimulating) {
-      if (autoSimRef.current) clearInterval(autoSimRef.current);
-      autoSimRef.current = null;
-      setIsAutoSimulating(false);
-      setRiderSpeed(0);
-      setGpsStatus('⏸ Auto-Drive Simulator Paused');
-    } else {
-      setIsAutoSimulating(true);
-      setGpsStatus('▶ Auto-Drive Active (Streaming live path every 2.5s)...');
-      handleSimulateMovement(order, 0.15);
-      autoSimRef.current = setInterval(() => {
-        handleSimulateMovement(order, 0.15);
-      }, 2500);
-    }
-  };
-
-  // Helper to ensure Rider starting position is within 2 km of customer for realistic presentation
-  const getNearbyRiderStartingPoint = (order: any) => {
-    const cLat = order?.address?.latitude || 28.4682;
-    const cLng = order?.address?.longitude || 77.0384;
-    let sLat = order?.store?.latitude || 28.4595;
-    let sLng = order?.store?.longitude || 77.0266;
-
-    const R = 6371;
-    const dLat = ((cLat - sLat) * Math.PI) / 180;
-    const dLon = ((cLng - sLng) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((sLat * Math.PI) / 180) *
-        Math.cos((cLat * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const distKm = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * R;
-
-    // If store is farther than 2 km, position rider at a 1.2 km hub along the route
-    if (distKm > 2.0) {
-      const ratio = 1.2 / distKm;
-      sLat = Number((cLat + (sLat - cLat) * ratio).toFixed(5));
-      sLng = Number((cLng + (sLng - cLng) * ratio).toFixed(5));
-    }
-    return { lat: sLat, lng: sLng };
-  };
-
-  // Reset simulated rider back to Pickup Store (guaranteed within 2 km of customer)
-  const handleResetToStore = async (order: any) => {
-    if (autoSimRef.current) {
-      clearInterval(autoSimRef.current);
-      autoSimRef.current = null;
-      setIsAutoSimulating(false);
-    }
-    const { lat: startLat, lng: startLng } = getNearbyRiderStartingPoint(order);
-    setCurrentGps({ lat: startLat, lng: startLng });
-    setCurrentHeading(0);
-    setRiderSpeed(0);
-    setGpsStatus(`↺ Rider reset to Pickup Hub (${startLat.toFixed(4)}°N, ${startLng.toFixed(4)}°E • ~1.2 km to drop)`);
-    emitLocation({ latitude: startLat, longitude: startLng, heading: 0, speed: 0 });
-    try {
-      await api.post('/delivery/location', {
-        latitude: startLat,
-        longitude: startLng,
-        heading: 0,
-        speed: 0,
-        orderId: order?.id,
-      });
-      await refetchActive();
-    } catch {}
   };
 
   if (!isAuthenticated || user?.role !== 'DELIVERY_PARTNER') {
@@ -568,52 +428,14 @@ export default function DeliveryDashboardPage() {
           <button
             type="button"
             onClick={handleFetchRealGps}
-            disabled={isUpdatingGps}
-            className="px-3.5 py-2 bg-[#FFF2E5] border border-[#D9700F] text-[#D9700F] hover:bg-[#D9700F] hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+            disabled={isUpdatingGps || isRouteSimulating}
+            title={isRouteSimulating ? 'Disabled while the virtual rider simulation is running' : undefined}
+            className="px-3.5 py-2 bg-[#FFF2E5] border border-[#D9700F] disabled:opacity-60 text-[#D9700F] hover:bg-[#D9700F] hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
           >
             <Compass className="w-3.5 h-3.5" />
             <span>{isUpdatingGps ? 'Locating...' : 'Fetch Device GPS'}</span>
           </button>
 
-          {activeDeliveries.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Auto Drive Simulation Loop */}
-              <button
-                type="button"
-                onClick={() => handleToggleAutoSimulate(activeDeliveries[0]?.order)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm ${
-                  isAutoSimulating
-                    ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse shadow-red-500/30'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
-                }`}
-              >
-                {isAutoSimulating ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                <span>{isAutoSimulating ? 'Pause Auto-Drive' : '▶ Auto-Drive Simulator'}</span>
-              </button>
-
-              {/* Single Step Drive Closer */}
-              <button
-                type="button"
-                onClick={() => handleSimulateMovement(activeDeliveries[0]?.order, 0.25)}
-                className="px-3 py-2 bg-purple-50 border border-purple-300 text-purple-700 hover:bg-purple-700 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-                title="Drive 25% closer to customer"
-              >
-                <Navigation className="w-3.5 h-3.5" />
-                <span>Step Closer</span>
-              </button>
-
-              {/* Reset to Store Hub */}
-              <button
-                type="button"
-                onClick={() => handleResetToStore(activeDeliveries[0]?.order)}
-                className="px-2.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition-all flex items-center gap-1 shadow-sm"
-                title="Reset rider position to pickup store"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reset Hub</span>
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
@@ -713,7 +535,7 @@ export default function DeliveryDashboardPage() {
                         className="w-full sm:w-auto px-7 py-3 bg-[#D9700F] text-white rounded-2xl font-black text-xs hover:bg-primary-hover shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
                       >
                         <Bike className="w-4 h-4" />
-                        <span>{isAccepting ? 'Accepting Request...' : 'Accept Delivery Request (Take Order)'}</span>
+                        <span>{isAccepting ? 'Accepting Request...' : 'Accept Order'}</span>
                       </button>
                     </div>
                   </div>
@@ -869,21 +691,23 @@ export default function DeliveryDashboardPage() {
                     </div>
                   </div>
 
-                  {/* In-App Mini Route Map */}
-                  <RiderMiniRouteMap
-                    riderLat={currentGps.lat}
-                    riderLng={currentGps.lng}
-                    riderHeading={currentHeading}
-                    riderSpeed={riderSpeed}
-                    isSocketLive={isSocketLive}
-                    storeLat={ord?.store?.latitude || 28.4595}
-                    storeLng={ord?.store?.longitude || 77.0266}
-                    customerLat={ord?.address?.latitude || 28.4682}
-                    customerLng={ord?.address?.longitude || 77.0384}
-                    storeName={ord?.store?.name || 'Pickup Store'}
-                    customerName={ord?.customer?.name || 'Customer'}
+                  {/* Rider GPS capture + OSRM road route + virtual demo rider */}
+                  <DeliveryRouteSimulator
+                    orderId={ord?.id}
                     orderNumber={ord?.orderNumber || ''}
                     orderStatus={ord?.status}
+                    customerName={ord?.customer?.name}
+                    routeOriginLat={ord?.store?.latitude}
+                    routeOriginLng={ord?.store?.longitude}
+                    assignedAt={assignment?.assignedAt}
+                    destinationLat={ord?.address?.latitude}
+                    destinationLng={ord?.address?.longitude}
+                    onUpdateStatus={handleUpdateStatus}
+                    onGpsCaptured={(lat, lng) => {
+                      setCurrentGps({ lat, lng });
+                      setGpsStatus(`Rider GPS captured: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`);
+                    }}
+                    onSimulatingChange={setIsRouteSimulating}
                   />
 
                   {/* Rider Sequential Action Pipeline */}

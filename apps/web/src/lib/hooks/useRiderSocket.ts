@@ -1,4 +1,4 @@
-﻿'use client';
+﻿﻿'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
@@ -9,6 +9,11 @@ interface RiderLocationPayload {
   longitude: number;
   heading?: number;
   speed?: number;
+  /** 'GPS' = real device location, 'SIMULATION' = clearly-labelled virtual demo rider. */
+  source?: 'GPS' | 'SIMULATION';
+  progress?: number;
+  remainingMeters?: number;
+  stage?: string;
 }
 
 interface UseRiderSocketOptions {
@@ -67,11 +72,21 @@ export function useRiderSocket({ orderId, onAck }: UseRiderSocketOptions): UseRi
   }, [orderId]);
 
   const emitLocation = useCallback(
-    ({ latitude, longitude, heading, speed }: Omit<RiderLocationPayload, 'orderId'>) => {
+    ({
+      latitude,
+      longitude,
+      heading,
+      speed,
+      source,
+      progress,
+      remainingMeters,
+      stage,
+    }: Omit<RiderLocationPayload, 'orderId'>) => {
       if (!socketRef.current?.connected || !orderId) return;
+      const token = localStorage.getItem('prerna_access_token') ?? undefined;
       socketRef.current.emit(
         'updateRiderLocation',
-        { orderId, latitude, longitude, heading, speed },
+        { orderId, latitude, longitude, heading, speed, source, progress, remainingMeters, stage, token },
         (res: { success: boolean }) => {
           if (res?.success) setLastPing(new Date().toISOString());
           onAckRef.current?.(res);

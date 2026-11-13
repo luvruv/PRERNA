@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -18,20 +18,29 @@ import {
   ShieldCheck,
   KeyRound,
   Lock,
+  Search,
+  BellRing,
+  X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { OrderGpsTrackingMap } from '@/components/orders/OrderGpsTrackingMap';
+import { useOrderTracking } from '@/lib/hooks/useOrderTracking';
 
+// Customer-facing delivery flow. Maps onto the existing OrderStatus enum (no new statuses):
+// PENDING/CONFIRMED/PREPARING/READY_FOR_PICKUP -> waiting, ASSIGNED -> accepted,
+// PICKED_UP -> rider started, OUT_FOR_DELIVERY -> on the way / reached, DELIVERED.
 const ORDER_STEPS = [
-  { key: 'PENDING', label: 'Order Placed', desc: 'Received by system' },
-  { key: 'CONFIRMED', label: 'Order Confirmed', desc: 'Accepted by merchant' },
-  { key: 'PREPARING', label: 'Preparing', desc: 'Packing in carry bag' },
-  { key: 'READY_FOR_PICKUP', label: 'Ready for Pickup', desc: 'Awaiting rider pickup' },
-  { key: 'ASSIGNED', label: 'Rider Assigned', desc: 'Delivery partner allocated' },
-  { key: 'PICKED_UP', label: 'Picked Up', desc: 'Rider collected package' },
-  { key: 'OUT_FOR_DELIVERY', label: 'Out for Delivery', desc: 'Rider en route to your door' },
-  { key: 'DELIVERED', label: 'Delivered', desc: 'Handed over at doorstep' },
+  { key: 'ORDER_PLACED', label: 'Order Placed', desc: 'Your order has been received' },
+  { key: 'PENDING', label: 'Waiting for Delivery Partner', desc: 'Finding a delivery partner near you' },
+  { key: 'ACCEPTED', label: 'Delivery Partner Assigned', desc: 'A rider has accepted your order' },
+  { key: 'RIDER_STARTED', label: 'Your Rider Is On The Way', desc: 'Rider has started towards you' },
+  { key: 'ON_THE_WAY', label: 'Order Is On The Way', desc: 'Rider is heading to your location' },
+  { key: 'REACHED_DESTINATION', label: 'Rider Reached Your Location', desc: 'Share your PIN to receive the order' },
+  { key: 'DELIVERED', label: 'Order Delivered', desc: 'Handed over at doorstep' },
 ];
+
+const WAITING_STATUSES = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'];
+const REACHED_MARKER = 'REACHED_DESTINATION';
 
 export default function OrderTrackingPage() {
   const params = useParams();
@@ -43,8 +52,35 @@ export default function OrderTrackingPage() {
   const { data: order, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['order', orderId],
     queryFn: () => api.get(`/orders/${orderId}`),
-    refetchInterval: 4000, // Auto-poll every 4s for live order tracking updates
+    refetchInterval: 4000, // Fallback poll; Socket.IO events below make updates instant
   });
+
+  // Real-time updates (acceptance notification, status changes, rider movement)
+  const realOrderId: string | undefined = order?.id;
+  const { isConnected, joinError, acceptedEvent, riderEvent, liveStatus } = useOrderTracking({
+    orderId: realOrderId,
+    onOrderChanged: () => {
+      refetch();
+    },
+  });
+
+  // "Order Picked!" notification: shown when acceptance happens while this page is open
+  const [showAcceptedBanner, setShowAcceptedBanner] = useState(false);
+  const wasAcceptedRef = useRef(false);
+  const isAccepted = !!order?.deliveryAssignment;
+  useEffect(() => {
+    if (!order) return;
+    if (wasAcceptedRef.current === false && isAccepted) setShowAcceptedBanner(true);
+    wasAcceptedRef.current = isAccepted;
+  }, [order, isAccepted]);
+  useEffect(() => {
+    if (acceptedEvent) setShowAcceptedBanner(true);
+  }, [acceptedEvent]);
+  useEffect(() => {
+    if (!showAcceptedBanner) return;
+    const t = setTimeout(() => setShowAcceptedBanner(false), 12000);
+    return () => clearTimeout(t);
+  }, [showAcceptedBanner]);
 
   if (isLoading) {
     return (
@@ -66,9 +102,25 @@ export default function OrderTrackingPage() {
     );
   }
 
-  const currentStatusIndex = ORDER_STEPS.findIndex((s) => s.key === order.status);
-  const isCancelled = order.status === 'CANCELLED';
-  const canCancel = order.status === 'PENDING' || order.status === 'CONFIRMED';
+  // A socket status event is applied immediately; the persisted order catches up on the next refetch.
+  const effectiveStatus: string = liveStatus || order.status;
+  const isCancelled = effectiveStatus === 'CANCELLED';
+  const hasAssignment = !!order.deliveryAssignment;
+  const isWaitingForPartner = !hasAssignment && WAITING_STATUSES.includes(order.status);
+  // Show the customer map as soon as the rider accepts the order.
+  const trackingUnlocked =
+    hasAssignment && ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY'].includes(effectiveStatus) && !isCancelled;
+  const reachedDestination =
+    riderEvent?.stage != null
+      ? riderEvent.stage === REACHED_MARKER
+      : order.deliveryAssignment?.notes === REACHED_MARKER;
+
+  let currentStatusIndex = 1; // waiting for delivery partner
+  if (effectiveStatus === 'DELIVERED') currentStatusIndex = 6;
+  else if (effectiveStatus === 'OUT_FOR_DELIVERY') currentStatusIndex = reachedDestination ? 5 : 4;
+  else if (effectiveStatus === 'PICKED_UP') currentStatusIndex = 3;
+  else if (effectiveStatus === 'ASSIGNED') currentStatusIndex = 2;
+  const canCancel = !hasAssignment && (order.status === 'PENDING' || order.status === 'CONFIRMED');
 
   const handleCancelOrder = async () => {
     if (!confirm('Are you sure you want to cancel this order?')) return;
@@ -125,12 +177,12 @@ export default function OrderTrackingPage() {
               className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
                 isCancelled
                   ? 'bg-red-100 text-red-700'
-                  : order.status === 'DELIVERED'
+                  : effectiveStatus === 'DELIVERED'
                   ? 'bg-emerald-100 text-emerald-700'
                   : 'bg-amber-100 text-[#D9700F]'
               }`}
             >
-              {order.status.replace(/_/g, ' ')}
+              {isWaitingForPartner ? 'WAITING FOR DELIVERY PARTNER' : effectiveStatus.replace(/_/g, ' ')}
             </span>
           </div>
           <p className="text-xs text-[#8C6D53] mt-1">
@@ -151,8 +203,60 @@ export default function OrderTrackingPage() {
         </div>
       </div>
 
+      {/* Real-time acceptance notification */}
+      {showAcceptedBanner && !isCancelled && (
+        <div className="relative bg-emerald-50 border-2 border-emerald-300 rounded-3xl p-5 shadow-card flex items-start gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/25">
+            <BellRing className="w-5 h-5" />
+          </div>
+          <div className="pr-6">
+            <h3 className="font-black text-base text-emerald-900">Order Picked!</h3>
+            <p className="text-xs text-emerald-800 font-medium">
+              Your Rider Is On The Way.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAcceptedBanner(false)}
+            className="absolute top-3 right-3 p-1 rounded-full text-emerald-700 hover:bg-emerald-100"
+            aria-label="Dismiss notification"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Before a delivery partner accepts: clean waiting screen only (no map, no rider data) */}
+      {isWaitingForPartner && !isCancelled && (
+        <div className="bg-white rounded-3xl p-8 border border-[#F0DEC8] shadow-card text-center space-y-4">
+          <div className="relative w-20 h-20 mx-auto">
+            <span className="absolute inset-0 rounded-full bg-orange-100 animate-ping" />
+            <div className="relative w-20 h-20 rounded-full bg-[#FFF2E5] border-2 border-[#D9700F]/40 text-[#D9700F] flex items-center justify-center">
+              <Search className="w-8 h-8" />
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Order Confirmed
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-[#6B3A0A]">Waiting for Delivery Partner</h2>
+            <p className="text-sm text-[#8C6D53] mt-1">Finding a delivery partner for your order...</p>
+          </div>
+          <p className="text-xs text-[#A66C3E] max-w-md mx-auto">
+            Live tracking will appear here automatically as soon as a delivery partner accepts your order. You don't
+            need to refresh this page.
+          </p>
+        </div>
+      )}
+
+      {joinError && !isWaitingForPartner && (
+        <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-[#6B3A0A] font-semibold">
+          Live updates are unavailable ({joinError}). Showing the latest saved status.
+        </div>
+      )}
+
       {/* Dedicated Customer Doorstep Delivery PIN / OTP Banner */}
-      {!isCancelled && (
+      {!isCancelled && hasAssignment && (
         <div className="bg-gradient-to-r from-[#FFF5EB] via-[#FAF3EB] to-[#FFF9F5] rounded-3xl p-5 sm:p-6 border-2 border-[#D9700F]/40 shadow-soft relative overflow-hidden">
           <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-[#D9700F]/5 rounded-full pointer-events-none" />
           
@@ -166,7 +270,7 @@ export default function OrderTrackingPage() {
                   <span className="text-xs font-black uppercase tracking-wider text-[#D9700F] bg-orange-100/80 px-2.5 py-0.5 rounded-full">
                     Doorstep Delivery Security PIN
                   </span>
-                  {order.status === 'OUT_FOR_DELIVERY' && (
+                  {effectiveStatus === 'OUT_FOR_DELIVERY' && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full animate-pulse">
                       ● Rider Arriving Soon
                     </span>
@@ -183,7 +287,7 @@ export default function OrderTrackingPage() {
 
             {/* OTP Code Box & Copy */}
             <div className="flex flex-col sm:items-end gap-2 shrink-0">
-              {order.status === 'DELIVERED' ? (
+              {effectiveStatus === 'DELIVERED' ? (
                 <div className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-300">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                   <span>Verified & Delivered</span>
@@ -223,7 +327,7 @@ export default function OrderTrackingPage() {
               )}
 
               <span className="text-[11px] font-medium text-[#8C6D53]">
-                {order.status === 'DELIVERED'
+                {effectiveStatus === 'DELIVERED'
                   ? 'Delivery confirmed successfully'
                   : 'Valid until order handover is complete'}
               </span>
@@ -232,23 +336,24 @@ export default function OrderTrackingPage() {
         </div>
       )}
 
-      {/* Live GPS Route Tracking Map */}
-      {!isCancelled && (
+      {/* Live GPS Route Tracking Map - unlocked only after a delivery partner accepts */}
+      {trackingUnlocked && (
         <OrderGpsTrackingMap
-          orderId={order.id}
-          orderStatus={order.status}
-          storeName={order.store?.name}
-          storeAddress={order.store?.address}
-          customerAddress={order.address?.street}
-          customerLabel={order.address?.label}
+          orderStatus={effectiveStatus}
           riderName={rider?.user?.name}
           riderVehicle={rider?.vehicleType ? `${rider.vehicleType} (${rider.vehicleNumber || ''})` : undefined}
-          riderLat={delivery?.currentLat || rider?.currentLat}
-          riderLng={delivery?.currentLng || rider?.currentLng}
-          storeLat={order.store?.latitude}
-          storeLng={order.store?.longitude}
+          riderLat={delivery?.currentLat ?? rider?.currentLat}
+          riderLng={delivery?.currentLng ?? rider?.currentLng}
+          assignedAt={delivery?.assignedAt}
+          routeOriginLat={order.store?.latitude}
+          routeOriginLng={order.store?.longitude}
+          liveEvent={riderEvent}
+          isSocketConnected={isConnected}
           customerLat={order.address?.latitude}
           customerLng={order.address?.longitude}
+          customerAddress={order.address?.street}
+          customerLabel={order.address?.label}
+          reachedDestination={reachedDestination}
         />
       )}
 
@@ -261,7 +366,7 @@ export default function OrderTrackingPage() {
               <span>Live Delivery Timeline</span>
             </h2>
             <span className="text-xs font-bold text-[#D9700F] bg-[#FFF2E5] px-3 py-1 rounded-full border border-[#D9700F]/30">
-              ⚡ ETA: 10-15 Minutes
+              {isWaitingForPartner ? 'Awaiting rider' : '⚡ Rider assigned'}
             </span>
           </div>
 

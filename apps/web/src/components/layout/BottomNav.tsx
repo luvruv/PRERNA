@@ -4,16 +4,22 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, LayoutGrid, Search, ShoppingBag, User } from 'lucide-react';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useCartStore } from '@/lib/store/useCartStore';
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const user = useAuthStore((state) => state.user);
   const { cart } = useCartStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  if (user?.role === 'SHOPKEEPER' || user?.role === 'DELIVERY_PARTNER') {
+    return null;
+  }
 
   const navItems = [
     { label: 'Home', href: '/', icon: Home },

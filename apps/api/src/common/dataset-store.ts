@@ -62,6 +62,8 @@ export interface DatasetOrder {
     storeId: string;
     name: string;
     address: string;
+    latitude?: number;
+    longitude?: number;
   };
   deliveryAddress: {
     label: string;
@@ -98,6 +100,7 @@ export interface DatasetOrder {
     riderPhone: string;
     vehicle: string;
     status: string;
+    assignedAt?: string;
     currentLat?: number;
     currentLng?: number;
     estimatedDeliveryMins?: number;

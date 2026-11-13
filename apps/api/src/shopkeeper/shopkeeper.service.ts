@@ -26,6 +26,10 @@ export class ShopkeeperService {
     const defaultStore = datasetStore.getStoreById('store-1') || datasetStore.getStores()[0];
 
     if (!this.prisma.isConnected) {
+      const merchantStore = datasetStore.getStoreById('sunrise-fresh-market');
+      if (userId === 'demo-merchant-id' && merchantStore) {
+        return { ...merchantStore, name: 'Sunrise Fresh Market' };
+      }
       return defaultStore;
     }
 
@@ -109,6 +113,11 @@ export class ShopkeeperService {
     if (typeof data.deliveryRadiusKm === 'number') updateData.deliveryRadiusKm = data.deliveryRadiusKm;
     if (data.address) updateData.address = data.address;
 
+    if (!this.prisma.isConnected) {
+      datasetStore.updateStore(store.id, updateData);
+      return datasetStore.getStoreById(store.id) || store;
+    }
+
     return this.prisma.store.update({
       where: { id: store.id },
       data: updateData,
@@ -121,7 +130,12 @@ export class ShopkeeperService {
     const storeOrders = datasetStore.getOrders().filter((o) => o.store.storeId === store.id || o.store.name === store.name);
 
     if (!this.prisma.isConnected) {
-      const todaysSales = storeOrders.reduce((sum, o) => sum + (o.billing?.totalAmount || 0), 0);
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const todaysOrders = storeOrders.filter((order) => new Date(order.timestamp) >= startOfDay);
+      const todaysSales = todaysOrders.reduce((sum, order) => sum + (order.billing?.totalAmount || 0), 0);
+      const totalSales = storeOrders.reduce((sum, order) => sum + (order.billing?.totalAmount || 0), 0);
+      const pendingOrdersCount = storeOrders.filter((order) => order.orderStatus === OrderStatus.PENDING).length;
       const lowStockCount = storeProducts.filter((p) => p.availableQty <= p.lowStockThreshold).length;
 
       return {
@@ -130,14 +144,22 @@ export class ShopkeeperService {
           name: store.name,
           slug: store.slug,
           address: store.address,
+          city: store.city,
+          state: store.state,
+          postalCode: store.postalCode,
+          phone: store.phone,
+          latitude: store.latitude,
+          longitude: store.longitude,
+          deliveryRadiusKm: store.deliveryRadiusKm,
           rating: store.rating,
         },
         metrics: {
-          todaysOrdersCount: storeOrders.length || 6,
-          todaysSales: todaysSales || 2450,
-          pendingOrdersCount: 2,
+          todaysOrdersCount: todaysOrders.length,
+          todaysSales: Math.round(todaysSales * 100) / 100,
+          totalSales: Math.round(totalSales * 100) / 100,
+          pendingOrdersCount,
           lowStockCount,
-          totalProducts: storeProducts.length || 74,
+          totalProducts: storeProducts.length,
         },
         recentOrders: storeOrders.slice(0, 5),
       };
@@ -149,6 +171,7 @@ export class ShopkeeperService {
 
       const [
         todaysOrders,
+        allTimeSales,
         pendingOrdersCount,
         totalProducts,
         lowStockProducts,
@@ -160,6 +183,10 @@ export class ShopkeeperService {
             createdAt: { gte: startOfDay },
           },
           select: { total: true, status: true },
+        }),
+        this.prisma.order.aggregate({
+          where: { storeId: store.id },
+          _sum: { total: true },
         }),
         this.prisma.order.count({
           where: {
@@ -188,6 +215,7 @@ export class ShopkeeperService {
       ]);
 
       const todaysSales = todaysOrders.reduce((sum, o) => sum + o.total, 0);
+      const totalSales = allTimeSales._sum.total ?? 0;
 
       return {
         store: {
@@ -195,11 +223,19 @@ export class ShopkeeperService {
           name: store.name,
           slug: store.slug,
           address: store.address,
+          city: store.city,
+          state: store.state,
+          postalCode: store.postalCode,
+          phone: store.phone,
+          latitude: store.latitude,
+          longitude: store.longitude,
+          deliveryRadiusKm: store.deliveryRadiusKm,
           rating: store.rating,
         },
         metrics: {
           todaysOrdersCount: todaysOrders.length,
           todaysSales: Math.round(todaysSales * 100) / 100,
+          totalSales: Math.round(totalSales * 100) / 100,
           pendingOrdersCount,
           lowStockCount: lowStockProducts,
           totalProducts,
@@ -212,6 +248,9 @@ export class ShopkeeperService {
         metrics: {
           todaysOrdersCount: storeOrders.length,
           todaysSales: 2450,
+          totalSales: Math.round(
+            storeOrders.reduce((sum, order) => sum + (order.billing?.totalAmount || 0), 0) * 100,
+          ) / 100,
           pendingOrdersCount: 1,
           lowStockCount: 4,
           totalProducts: storeProducts.length,
@@ -225,7 +264,13 @@ export class ShopkeeperService {
     const store = await this.getShopkeeperStore(userId);
 
     if (!this.prisma.isConnected) {
-      let orders = datasetStore.getOrders();
+      const datasetStoreRecord = datasetStore.getStoreById(store.id);
+      let orders = datasetStore.getOrders().filter(
+        (order) =>
+          order.store?.storeId === store.id ||
+          order.store?.name === store.name ||
+          order.store?.name === datasetStoreRecord?.name,
+      );
       if (status) {
         orders = orders.filter((o) => o.orderStatus === status);
       }

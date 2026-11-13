@@ -19,6 +19,7 @@ import {
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import InteractiveLocationPicker from '@/components/map/InteractiveLocationPicker';
+import GooglePlacesAddressInput from '@/components/map/GooglePlacesAddressInput';
 
 export default function ShopkeeperStoreLocationPage() {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
@@ -278,7 +279,9 @@ export default function ShopkeeperStoreLocationPage() {
             <div className="flex items-center justify-between text-xs font-black text-[#6B3A0A]">
               <span className="flex items-center gap-1.5">
                 <span>Delivery Coverage Radius</span>
-                <span className="text-[10px] font-bold text-[#8C6D53] font-normal">(Shown as circle on map)</span>
+                <span className="text-[10px] text-[#8C6D53] font-normal">
+  (Shown as circle on map)
+</span>
               </span>
               <span className="text-base text-[#D9700F] font-black">{formData.deliveryRadiusKm} km</span>
             </div>
@@ -327,11 +330,23 @@ export default function ShopkeeperStoreLocationPage() {
             {/* Full Street Address */}
             <div>
               <label className="text-xs font-bold text-[#6B3A0A] block mb-1">Full Street Address</label>
-              <textarea
+              <GooglePlacesAddressInput
                 required
+                multiline
                 rows={2}
                 value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                onChange={(address) => setFormData((prev) => ({ ...prev, address }))}
+                onPlaceSelected={(place) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    address: place.address,
+                    city: place.city || prev.city,
+                    state: place.state || prev.state,
+                    postalCode: place.postalCode || prev.postalCode,
+                    latitude: place.latitude ?? prev.latitude,
+                    longitude: place.longitude ?? prev.longitude,
+                  }))
+                }
                 className="w-full px-3.5 py-2.5 bg-white border border-[#F0DEC8] rounded-xl text-xs font-semibold focus:outline-none focus:border-[#D9700F]"
                 placeholder="Shop number, market, sector..."
               />
